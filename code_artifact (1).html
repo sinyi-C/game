@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>國立虎尾科技大學 - 九宮格賓果資安防衛戰</title>
+  <title>九宮格賓果資安防衛戰</title>
   <style>
     * {
       box-sizing: border-box;
@@ -554,7 +554,7 @@
   <!-- 挑戰進入頁面 -->
   <div id="start-screen">
     <div style="font-size: 68px; margin-bottom: 12px;">🐯 🛡️ 🎯</div>
-    <h1 style="font-size: 38px; margin: 0 0 8px 0; font-weight: 900; letter-spacing: 1px;">國立虎尾科技大學 資安防釣九宮格</h1>
+    <h1 style="font-size: 38px; margin: 0 0 8px 0; font-weight: 900; letter-spacing: 1px;">資安防釣九宮格</h1>
     <h3 style="color: #38bdf8; margin: 0 0 24px 0; font-weight: 700; font-size: 20px;">校園社交工程實境防衛戰・連線摸彩大挑戰</h3>
     <div class="rules-card">
       <div>📌 <b>遊戲規則說明：</b></div>
@@ -569,7 +569,7 @@
   <!-- 頂部資訊列 -->
   <div class="top-bar">
     <div class="game-logo">
-      <span>🐯 國立虎尾科技大學 資安賓果防衛戰</span>
+      <span>🐯 安賓果防衛戰</span>
     </div>
     <div class="status-group">
       <span class="phase-badge" id="phase-tag">九宮格選題大廳</span>
@@ -770,13 +770,13 @@
       renderHTML: () => `
         <div class="mail-header-bar">
           <span style="font-weight:800; color:#dc2626;">⚠️ 系統自動阻擋通知</span>
-          <span style="font-size:14px; color:#64748b;">虎科大 Webmail 郵件伺服器</span>
+          <span style="font-size:14px; color:#64748b;">虎科大 mail 郵件伺服器</span>
         </div>
         <div class="subject-title">
           <span class="spot" data-reason="破綻 1：主旨使用【最後通牒】與情緒勒索字眼製造恐慌，官方通知語氣平和。">【最後通牒】您的 NFU 校園信箱已達 99.9%，未驗證將於今日銷毀！</span>
         </div>
         <div class="mail-meta">
-          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">電算中心網路組 <span class="spot" data-reason="破綻 2：虎科大官方網域為 nfu.edu.tw，此處使用非教育體系的 .org 混淆網域！">&lt;admin@nfu-webmail-center.org&gt;</span></span></div>
+          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">電算中心 <span class="spot" data-reason="破綻 2：虎科大官方網域為 nfu.edu.tw，此處使用非教育體系的 .org 混淆網域！">&lt;admin@nfu-webmail-center.org&gt;</span></span></div>
           <div class="meta-row"><span>收件地址：</span><span class="meta-val">faculty@nfu.edu.tw</span></div>
           <div class="meta-row"><span>發送時間：</span><span class="meta-val"><span class="spot" data-reason="破綻 3：在凌晨 03:42 非公務時段發送緊急停權通知，屬異常自動化攻擊特徵。">2026/11/20 03:42 (凌晨)</span></span></div>
         </div>
@@ -825,19 +825,19 @@
       icon: "🏥",
       category: "醫療健檢恐慌型",
       shortTitle: "年度健康檢查紅字異常",
-      department: "學務處 衛生保健組",
+      department: "環安中心",
       topic: "醫療健檢恐慌型 - 體檢報告異常警告",
       spotCount: 4,
       renderHTML: () => `
         <div class="mail-header-bar">
           <span style="font-weight:800; color:#e11d48;">🩺 急件醫療檢驗通報</span>
-          <span style="font-size:14px; color:#64748b;">校園健康管理中心</span>
+          <span style="font-size:14px; color:#64748b;">環安中心</span>
         </div>
         <div class="subject-title">
-          <span class="spot" data-reason="破綻 1：正規健檢若有危及生命重大異常，醫院與衛保組必定電話親自聯繫，絕不會用聳動標題寄信！">【重大紅字警戒】您的教職員健康檢查血液腫瘤標記數值嚴重超標！</span>
+          <span class="spot" data-reason="破綻 1：正規健檢若有危及生命重大異常，醫院與環安中心必定電話親自聯繫，絕不會用聳動標題寄信！">【重大紅字警戒】您的教職員健康檢查血液腫瘤標記數值嚴重超標！</span>
         </div>
         <div class="mail-meta">
-          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">特約健檢中心 <span class="spot" data-reason="破綻 2：校內健檢通知應由衛保組 (@nfu.edu.tw) 發出，此為可疑的 .xyz 免費網域！">&lt;medical-alert@tw-health-check.xyz&gt;</span></span></div>
+          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">特約健檢中心 <span class="spot" data-reason="破綻 2：校內健檢通知應由環安中心 (@nfu.edu.tw) 發出，此為可疑的 .xyz 免費網域！">&lt;medical-alert@tw-health-check.xyz&gt;</span></span></div>
           <div class="meta-row"><span>收件地址：</span><span class="meta-val">teacher@nfu.edu.tw</span></div>
         </div>
         <div class="mail-content">
@@ -856,7 +856,7 @@
       icon: "🚗",
       category: "違規罰款催繳型",
       shortTitle: "校園車輛違停鎖車拖吊",
-      department: "總務處 事務組",
+      department: "總務處 警衛室",
       topic: "違規罰款催繳型 - 校園車牌通行異常",
       spotCount: 4,
       renderHTML: () => `
@@ -866,7 +866,7 @@
         </div>
         <div class="subject-title">【即刻拖吊通知】您的車輛未完成新學年車辨授權，明日將強制拖離校區</div>
         <div class="mail-meta">
-          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">總務處車輛管理組 <span class="spot" data-reason="破綻 1：拼湊 nfu 與 gov 的假冒網址 (.online)，並非學校官方網域 nfu.edu.tw！">&lt;parking@nfu-gov-traffic.online&gt;</span></span></div>
+          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">總務處警衛室 <span class="spot" data-reason="破綻 1：拼湊 nfu 與 gov 的假冒網址 (.online)，並非學校官方網域 nfu.edu.tw！">&lt;parking@nfu-gov-traffic.online&gt;</span></span></div>
           <div class="meta-row"><span>違規車號：</span><span class="meta-val"><span class="spot" data-reason="破綻 2：真正的違規通知一定會明確列出車牌號碼與違規照片，釣魚信只能含糊帶過！">（系統隱藏車牌號碼）</span></span></div>
         </div>
         <div class="mail-content">
@@ -876,7 +876,7 @@
           <p style="text-align:center;">
             <span class="spot btn-mock" data-reason="破綻 4：校內通行費皆透過校務系統或總務處出納繳納，絕不會導向外部刷卡網頁盜刷信用卡！">立即線上信用卡繳清 600 元規費 (https://pay-nfu-car.club)</span>
           </p>
-          <div style="font-size:13px; color:#94a3b8; margin-top:20px; border-top:1px dashed #cbd5e1; padding-top:10px;">國立虎尾科技大學 校園交通秩序維護隊</div>
+          <div style="font-size:13px; color:#94a3b8; margin-top:20px; border-top:1px dashed #cbd5e1; padding-top:10px;">國立虎尾科技大學 駐警隊</div>
         </div>
       `
     },
@@ -885,7 +885,7 @@
       icon: "🎁",
       category: "休閒福利誘惑型",
       shortTitle: "五星飯店住宿抵用券免費領",
-      department: "人事室 文康福利組",
+      department: "人事室",
       topic: "休閒福利誘惑型 - 文康旅遊住宿補助",
       spotCount: 4,
       renderHTML: () => `
@@ -914,7 +914,7 @@
       icon: "🤖",
       category: "時事學術倫理型",
       shortTitle: "生成式 AI 論文違規懲處清單",
-      department: "教務處 / 研發處",
+      department: "研究發展處",
       topic: "時事學術倫理型 - AI 學術倫理清查",
       spotCount: 4,
       renderHTML: () => `
@@ -972,7 +972,7 @@
       icon: "🤫",
       category: "校園八卦好奇型",
       shortTitle: "高層評鑑會議黑幕錄音流出",
-      department: "匿名爆料 / 秘書室",
+      department: "匿名爆料",
       topic: "校園八卦好奇型 - 內部升遷黑幕爆料",
       spotCount: 3,
       renderHTML: () => `
@@ -1000,7 +1000,7 @@
       icon: "🛡️",
       category: "資安軟體更新型",
       shortTitle: "校園防勒索病毒緊急修補",
-      department: "電算中心 資通安全組",
+      department: "電算中心",
       topic: "資安軟體更新型 - 假冒系統安全補丁",
       spotCount: 4,
       renderHTML: () => `
@@ -1010,7 +1010,7 @@
         </div>
         <div class="subject-title">【強制安全更新】校園網路偵測到大規模勒索病毒擴散，請立即安裝防禦補丁</div>
         <div class="mail-meta">
-          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">電算中心資安組 <span class="spot" data-reason="破綻 1：冒名虎科資安組，卻使用廉價的 .xyz 網域，非正式 @nfu.edu.tw！">&lt;security@nfu-cert-patch.xyz&gt;</span></span></div>
+          <div class="meta-row"><span>寄件單位：</span><span class="meta-val">電算中心<span class="spot" data-reason="破綻 1：冒名虎科電算中心，卻使用廉價的 .xyz 網域，非正式 @nfu.edu.tw！">&lt;security@nfu-cert-patch.xyz&gt;</span></span></div>
           <div class="meta-row"><span>收件地址：</span><span class="meta-val">lab-pc@nfu.edu.tw</span></div>
         </div>
         <div class="mail-content">
