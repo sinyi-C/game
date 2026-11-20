@@ -856,6 +856,7 @@
   const STORAGE_KEY_RECORD = "nfu_bingo_2026_passed_record";
   let clientIP = "偵測中";
 
+ // 強制只抓取傳統 4 組數字的 IPv4 位址（如 140.130.x.x）
   async function fetchClientIP() {
     const fetchWithTimeout = (url, ms = 3000) => {
       const controller = new AbortController();
@@ -863,17 +864,33 @@
       return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
     };
 
-    try {
-      const res = await fetchWithTimeout("https://www.cloudflare.com/cdn-cgi/trace");
-      const text = await res.text();
-      const match = text.match(/ip=(.+)/);
-      if (match && match[1]) return match[1].trim();
-    } catch (e) {}
+    const ipv4Regex = /^(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)\.(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
 
+    // 1. 主 API：ipify 純 IPv4 端點
     try {
       const res = await fetchWithTimeout("https://api.ipify.org?format=json");
       const data = await res.json();
-      if (data && data.ip) return data.ip;
+      if (data && data.ip && ipv4Regex.test(data.ip.trim())) {
+        return data.ip.trim();
+      }
+    } catch (e) {}
+
+    // 2. 備援 API 1：icanhazip 純 IPv4 端點
+    try {
+      const res = await fetchWithTimeout("https://ipv4.icanhazip.com/");
+      const ipText = (await res.text()).trim();
+      if (ipv4Regex.test(ipText)) {
+        return ipText;
+      }
+    } catch (e) {}
+
+    // 3. 備援 API 2：ipwho.is 強制 IPv4 查詢
+    try {
+      const res = await fetchWithTimeout("https://ipwho.is/");
+      const data = await res.json();
+      if (data && data.ip && ipv4Regex.test(data.ip.trim())) {
+        return data.ip.trim();
+      }
     } catch (e) {}
 
     return "行動裝置連線";
