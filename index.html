@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>國立虎尾科技大學 - 資安賓果連線防衛戰</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background-color: #0b1329;
+      color: #334155;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+    }
+
+    .main-screen {
+      background: #ffffff;
+      width: 100%;
+      max-width: 1360px;
+      height: 100%;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* ================= 頂部功能列 ================= */
+    .top-bar {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #1e293b;
+      flex-shrink: 0;
+      gap: 10px;
+    }
+
+    .game-logo {
+      font-size: clamp(16px, 2.2vw, 22px);
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn-sound, .btn-back {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      padding: 7px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .btn-back {
+      background: #334155;
+    }
+
+    .timer-badge {
+      background: #0284c7;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 105px;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .timer-badge.warning {
+      background: #dc2626 !important;
+      animation: pulse-danger 0.5s infinite;
+    }
+
+    .score-chip {
+      background: #e11d48;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    /* 倒數進度條 */
+    .timer-progress-track {
+      width: 100%;
+      height: 5px;
+      background: #334155;
+      flex-shrink: 0;
+    }
+
+    .timer-progress-fill {
+      width: 100%;
+      height: 100%;
+      background: #38bdf8;
+      transition: width 1s linear, background-color 0.3s;
+    }
+
+    /* 提示導覽列 */
+    .hint-bar {
+      background: #f1f5f9;
+      padding: 8px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #cbd5e1;
+      font-size: 14px;
+      color: #475569;
+      flex-shrink: 0;
+      gap: 10px;
+    }
+
+    .theme-badge {
+      background: #0284c7;
+      color: white;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    /* ================= 視圖 1：九宮格賓果大廳 ================= */
+    #grid-view {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 24px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .bingo-grid {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 14px;
+      width: 100%;
+      height: 100%;
+    }
+
+    .grid-cell {
+      background: #ffffff;
+      border: 2.5px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+      overflow: hidden;
+    }
+
+    .grid-cell:hover:not(.locked) {
+      border-color: #0284c7;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(2, 132, 199, 0.15);
+    }
+
+    .grid-cell:active:not(.locked) {
+      transform: scale(0.97);
+    }
+
+    .cell-icon {
+      font-size: clamp(26px, 4vh, 42px);
+      margin-bottom: 6px;
+      line-height: 1;
+    }
+
+    .cell-category {
+      font-size: clamp(11px, 1.5vh, 13px);
+      font-weight: 800;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 2px 10px;
+      border-radius: 20px;
+      margin-bottom: 6px;
+    }
+
+    .cell-title {
+      font-size: clamp(14px, 2vh, 18px);
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.3;
+    }
+
+    /* 通過狀態 */
+    .grid-cell.passed {
+      background: #f0fdf4;
+      border-color: #16a34a;
+      cursor: default;
+    }
+
+    /* 失敗狀態 (鎖定不可重試) */
+    .grid-cell.failed {
+      background: #fef2f2;
+      border-color: #dc2626;
+      opacity: 0.85;
+      cursor: not-allowed;
+    }
+
+    .status-stamp {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: clamp(24px, 4.5vh, 38px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      backdrop-filter: blur(2px);
+    }
+
+    .grid-cell.passed .status-stamp {
+      background: rgba(22, 163, 74, 0.88);
+      color: #ffffff;
+    }
+
+    .grid-cell.failed .status-stamp {
+      background: rgba(220, 38, 38, 0.88);
+      color: #ffffff;
+    }
+
+    /* ================= 視圖 2：單封信件抓漏挑戰 ================= */
+    #mail-view {
+      flex: 1;
+      min-height: 0;
+      display: none;
+      flex-direction: column;
+      background: #e2e8f0;
+      padding: 16px 24px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .single-mail-card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px 28px;
+      max-width: 920px;
+      width: 100%;
+      margin: 0 auto;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mail-subject {
+      font-size: clamp(18px, 2.5vw, 23px);
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 14px;
+      line-height: 1.4;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 12px;
+    }
+
+    .mail-meta-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 18px;
+      font-size: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
+      word-break: break-all;
+    }
+
+    .meta-label {
+      color: #64748b;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .meta-value {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .mail-body {
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.85;
+      color: #1e293b;
+    }
+
+    .mail-body p {
+      margin: 0 0 14px 0;
+    }
+
+    .mail-footer {
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px dashed #cbd5e1;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    /* 可點擊破綻樣式 */
+    .spot {
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 5px;
+      transition: background 0.15s;
+      display: inline-block;
+      word-break: break-word;
+    }
+
+    .spot:active {
+      background: #fee2e2;
+    }
+
+    .spot.found {
+      background: #fef2f2 !important;
+      outline: 2.5px dashed #dc2626;
+      pointer-events: none;
+      margin: 4px 0;
+      width: 100%;
+    }
+
+    .spot.found::after {
+      content: "🚨 破綻揭曉：" attr(data-reason);
+      display: block;
+      font-size: 13px;
+      color: #991b1b;
+      font-weight: 800;
+      background: #fff1f2;
+      border-left: 4px solid #dc2626;
+      padding: 6px 10px;
+      margin-top: 6px;
+      border-radius: 3px;
+      line-height: 1.45;
+    }
+
+    .spot.revealed {
+      background: #fffbeb !important;
+      outline: 2.5px solid #d97706;
+      pointer-events: none;
+      margin: 4px 0;
+      width: 100%;
+    }
+
+    .spot.revealed::after {
+      content: "💡 漏掉的陷阱：" attr(data-reason);
+      display: block;
+      font-size: 13px;
+      color: #b45309;
+      font-weight: 800;
+      background: #fef3c7;
+      border-left: 4px solid #d97706;
+      padding: 6px 10px;
+      margin-top: 6px;
+      border-radius: 3px;
+      line-height: 1.45;
+    }
+
+    .cta-fake-btn {
+      display: inline-block;
+      background: #dc2626;
+      color: #ffffff !important;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 800;
+      text-align: center;
+      margin: 6px 0;
+      word-break: break-all;
+    }
+
+    /* ================= 啟動首頁 & 慶祝灑花頁 & 彈窗 ================= */
+    .overlay-screen {
+      display: flex;
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100dvh;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+      text-align: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    #celebration-screen {
+      display: none;
+      background: radial-gradient(circle at center, #1e1b4b 0%, #090d16 100%);
+    }
+
+    #confetti-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10000;
+    }
+
+    .celebration-card {
+      background: rgba(255, 255, 255, 0.96);
+      color: #0f172a;
+      border-radius: 28px;
+      padding: 32px 28px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+      position: relative;
+      z-index: 10001;
+      border: 4px solid #facc15;
+    }
+
+    .btn-primary-action {
+      background: linear-gradient(90deg, #0284c7, #2563eb);
+      color: white;
+      border: none;
+      font-size: clamp(18px, 3vw, 22px);
+      font-weight: 900;
+      padding: 15px 40px;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
+      animation: pulse-start 1.6s infinite;
+      margin-top: 10px;
+    }
+
+    .btn-lottery {
+      background: linear-gradient(90deg, #eab308, #f97316);
+      color: #ffffff;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+      box-shadow: 0 10px 25px rgba(249, 115, 22, 0.5);
+    }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(4px);
+      justify-content: center;
+      align-items: center;
+      z-index: 5000;
+      padding: 16px;
+    }
+
+    .modal-box {
+      background: white;
+      border-radius: 22px;
+      padding: 28px 24px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .btn-modal {
+      border: none;
+      padding: 12px 32px;
+      font-size: 17px;
+      font-weight: 800;
+      border-radius: 12px;
+      cursor: pointer;
+      color: white;
+      background: #0284c7;
+    }
+
+    @keyframes pulse-danger {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+
+    @keyframes pulse-start {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    /* ================= RWD 響應式：手機直式 (Portrait) ================= */
+    @media (max-width: 768px) {
+      body {
+        padding: 0;
+      }
+      .main-screen {
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .top-bar {
+        padding: 10px 12px;
+      }
+      .game-logo span.full-title {
+        display: none;
+      }
+      .game-logo span.short-title {
+        display: inline !important;
+      }
+      .hint-bar {
+        padding: 7px 12px;
+        font-size: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      #grid-view {
+        padding: 10px;
+      }
+      .bingo-grid {
+        gap: 8px;
+      }
+      .grid-cell {
+        border-radius: 12px;
+        padding: 6px 4px;
+      }
+      .cell-icon {
+        font-size: 24px;
+        margin-bottom: 4px;
+      }
+      .cell-category {
+        font-size: 10px;
+        padding: 1px 6px;
+        margin-bottom: 3px;
+      }
+      .cell-title {
+        font-size: 13px;
+      }
+      #mail-view {
+        padding: 10px;
+      }
+      .single-mail-card {
+        padding: 16px 14px;
+        border-radius: 12px;
+      }
+      .mail-meta-box {
+        grid-template-columns: 1fr;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+    }
+
+    /* ================= RWD 響應式：手機橫式矮螢幕 (Landscape) ================= */
+    @media (max-height: 520px) and (orientation: landscape) {
+      body {
+        padding: 0;
+      }
+      .main-screen {
+        border-radius: 0;
+      }
+      .top-bar {
+        padding: 6px 16px;
+      }
+      .hint-bar {
+        padding: 4px 16px;
+        font-size: 12px;
+        flex-direction: row;
+        align-items: center;
+      }
+      #grid-view {
+        padding: 8px 16px;
+      }
+      .bingo-grid {
+        gap: 8px;
+      }
+      .grid-cell {
+        flex-direction: row;
+        justify-content: flex-start;
+        text-align: left;
+        padding: 6px 12px;
+        gap: 10px;
+        border-radius: 10px;
+      }
+      .cell-icon {
+        font-size: 24px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+      }
+      .cell-text-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        overflow: hidden;
+      }
+      .cell-category {
+        font-size: 10px;
+        padding: 1px 6px;
+        margin-bottom: 2px;
+      }
+      .cell-title {
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .status-stamp {
+        font-size: 20px;
+      }
+      #mail-view {
+        padding: 8px 16px;
+      }
+      .single-mail-card {
+        padding: 12px 16px;
+      }
+      .mail-subject {
+        font-size: 16px;
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+      }
+      .mail-meta-box {
+        grid-template-columns: 1fr 1fr;
+        padding: 8px 12px;
+        margin-bottom: 10px;
+        font-size: 12px;
+      }
+      .overlay-screen {
+        padding: 12px;
+      }
+      .overlay-screen h1 {
+        font-size: 22px !important;
+        margin-bottom: 6px !important;
+      }
+      .overlay-screen p {
+        font-size: 14px !important;
+        margin-bottom: 12px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 1. 挑戰進入首頁 -->
+<div class="overlay-screen" id="start-screen">
+  <div style="font-size: clamp(44px, 8vh, 68px); margin-bottom: 10px;">🐯🛡️</div>
+  <h1 style="font-size: clamp(24px, 4.5vw, 38px); margin: 0 0 10px 0; font-weight: 900;">
+    國立虎尾科技大學<br>資安社交工程九宮格挑戰
+  </h1>
+  <p style="font-size: clamp(14px, 2.2vw, 18px); color: #cbd5e1; max-width: 620px; line-height: 1.65; margin-bottom: 24px;">
+    🎯 <b>挑戰規則：</b>任選九宮格中的校園情境題目，在 <b>60 秒內</b> 點出信件內所有可疑破綻。<br>
+    ⚠️ 失敗格子將被鎖定！只要成功<b>連成任意一條直線（橫、直、斜）</b>，即可獲得現場摸彩資格！
+  </p>
+  <button class="btn-primary-action" id="btn-start">點擊開始連線挑戰</button>
+</div>
+
+<!-- 2. 連線成功慶祝灑花頁面 -->
+<canvas id="confetti-canvas"></canvas>
+<div class="overlay-screen" id="celebration-screen">
+  <div class="celebration-card">
+    <div style="font-size: 64px; margin-bottom: 8px;">🎉🏆🎊</div>
+    <h2 style="font-size: clamp(24px, 4vw, 32px); font-weight: 900; color: #b45309; margin: 0 0 10px 0;">
+      賓果連線成功！恭喜過關！
+    </h2>
+    <p style="font-size: 16px; color: #334155; line-height: 1.6; margin-bottom: 20px;">
+      您已成功識破校園社交工程陷阱並完成連線！<br>
+      <b style="color: #dc2626; font-size: 18px;">請向攤位工作人員出示此畫面進行摸彩！</b>
+    </p>
+    <div style="background: #fef3c7; border: 2px dashed #f59e0b; border-radius: 12px; padding: 10px; margin-bottom: 20px; font-weight: 800; color: #92400e;">
+      通關認證碼：<span id="win-code">NFU-2026-WIN</span>
+    </div>
+    <button class="btn-primary-action btn-lottery" onclick="restartWholeGame()">下一位挑戰者（重新洗牌）</button>
+  </div>
+</div>
+
+<!-- 3. 遊戲主畫面 -->
+<div class="main-screen">
+  <div class="top-bar">
+    <div class="game-logo">
+      <span>🐯</span>
+      <span class="full-title">國立虎尾科技大學 資安賓果連線挑戰</span>
+      <span class="short-title" style="display:none;">虎科大 資安賓果戰</span>
+    </div>
+
+    <div class="status-group">
+      <button class="btn-sound" id="btn-sound" onclick="toggleSound()">
+        <span id="sound-icon">🔊</span><span id="sound-text">音效開</span>
+      </button>
+
+      <!-- 答題模式專用計時與計分 -->
+      <div class="timer-badge" id="timer-box" style="display: none;">
+        <span>⏱️</span><span id="timer-text">60 秒</span>
+      </div>
+      <div class="score-chip" id="score-box" style="display: none;">
+        破綻：<span id="found-count">0</span> / <span id="total-spots">4</span>
+      </div>
+      <button class="btn-back" id="btn-giveup" style="display: none;" onclick="abandonCurrentCell()">放棄此格</button>
+    </div>
+  </div>
+
+  <!-- 時間進度條 -->
+  <div class="timer-progress-track" id="timer-track" style="display: none;">
+    <div class="timer-progress-fill" id="timer-bar"></div>
+  </div>
+
+  <!-- 狀態提示列 -->
+  <div class="hint-bar">
+    <div>目前狀態：<span class="theme-badge" id="status-badge">九宮格選題中</span></div>
+    <div id="hint-message">👉 請點擊任一格子進入挑戰，<b>連成一條線（橫、直、斜）</b>即可過關摸彩！</div>
+  </div>
+
+  <!-- 視圖 1：九宮格 -->
+  <div id="grid-view">
+    <div class="bingo-grid" id="bingo-grid"></div>
+  </div>
+
+  <!-- 視圖 2：單封信件抓漏 -->
+  <div id="mail-view">
+    <div class="single-mail-card" id="mail-card-content"></div>
+  </div>
+</div>
+
+<!-- 單題結算 / 死局提醒彈窗 -->
+<div class="modal-backdrop" id="result-modal">
+  <div class="modal-box">
+    <div id="modal-emoji" style="font-size: 52px; margin-bottom: 10px;">✅</div>
+    <h2 id="modal-title" style="margin: 0 0 10px 0; font-size: 24px; color: #0f172a;">本題挑戰通過！</h2>
+    <p id="modal-desc" style="color: #475569; font-size: 16px; line-height: 1.6; margin-bottom: 22px;"></p>
+    <button class="btn-modal" id="modal-btn">返回九宮格</button>
+  </div>
+</div>
+
+<script>
+  /* ============================================================
+     1. Web Audio API 音效與倒數 20 秒漸進加速提示音引擎
+     ============================================================ */
+  let audioCtx = null;
+  let soundEnabled = true;
+
+  function unlockAudio() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function playBeep(freq, duration, type = 'sine', vol = 0.45, delay = 0) {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+      unlockAudio();
+      const startTime = audioCtx.currentTime + delay;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(vol, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    } catch (e) {}
+  }
+
+  // 倒數 20 秒漸進加速提示音
+  function playCountdownTick(secondsLeft) {
+    if (!soundEnabled) return;
+    if (secondsLeft > 12) {
+      // 20~13秒：每秒 1 聲提示音
+      playBeep(780, 0.12, 'triangle', 0.5, 0);
+    } else if (secondsLeft > 6) {
+      // 12~7秒：每秒 2 聲急促音
+      playBeep(880, 0.10, 'triangle', 0.6, 0);
+      playBeep(880, 0.10, 'triangle', 0.6, 0.45);
+    } else {
+      // 6~1秒：每秒 4 聲極速警報音
+      [0, 0.22, 0.44, 0.66].forEach(offset => {
+        playBeep(1046.5, 0.08, 'sawtooth', 0.65, offset);
+      });
+    }
+  }
+
+  function playSpotFoundSound() {
+    playBeep(659.25, 0.12, 'sine', 0.5, 0);
+    playBeep(987.77, 0.22, 'sine', 0.5, 0.09);
+  }
+
+  function playCellPassSound() {
+    [523.25, 659.25, 783.99].forEach((f, i) => playBeep(f, 0.2, 'triangle', 0.5, i * 0.09));
+  }
+
+  function playCellFailSound() {
+    playBeep(240, 0.25, 'sawtooth', 0.55, 0);
+    playBeep(180, 0.35, 'sawtooth', 0.55, 0.26);
+  }
+
+  function playBingoWinFanfare() {
+    const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+    const times = [0, 0.12, 0.24, 0.36, 0.52, 0.66];
+    notes.forEach((f, idx) => playBeep(f, 0.32, 'triangle', 0.6, times[idx]));
+  }
+
+  function toggleSound() {
+    unlockAudio();
+    soundEnabled = !soundEnabled;
+    document.getElementById("sound-icon").textContent = soundEnabled ? "🔊" : "🔇";
+    document.getElementById("sound-text").textContent = soundEnabled ? "音效開" : "靜音";
+  }
+
+  /* ============================================================
+     2. 9 種不同社交工程類型題庫（每封信皆具不同陳述風格與 4 處破綻）
+     ============================================================ */
+  const phishingScenarios = [
+    {
+      id: 1,
+      icon: "📧",
+      category: "模擬社交工程",
+      shortTitle: "校園信箱停權通知",
+      subject: "【系統緊急告警】您的 NFU Webmail 空間已爆滿，收信功能已遭伺服器暫停",
+      senderName: "虎科大電算中心郵件管理員",
+      senderEmail: "webmail-admin@nfu-edu-tw.org",
+      senderClue: "虎尾科大官方網域為 nfu.edu.tw，此處使用偽造的 .org 外部網域！",
+      sendTime: "2026/11/20 03:42 (凌晨異常發信)",
+      timeClue: "校方系統自動通知不會在凌晨 3 點多要求教職員人工驗證帳號！",
+      recipient: "user@nfu.edu.tw",
+      bodyHtml: `
+        <p>親愛的 NFU 郵件用戶您好：</p>
+        <p>系統檢測到您的校園電子信箱容量已達 <b>99.9%</b>，目前已有 4 封重要公務公文遭伺服器退回。</p>
+        <p><span class="spot" data-reason="利用『2小時內永久刪除帳號與信件』製造高度恐慌，逼迫收件人失去戒心！">⚠️ 警告：請務必於收到本信 2 小時內完成空間擴充驗證，逾期系統將強制註銷帳號並清空所有歷史信件！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="網址為外部假網站 nfu-mail-verify.cc，點入輸入帳密即遭駭客盜取單一簽入權限！">👉 立即登入擴充 100GB 空間 (http://nfu-mail-verify.cc)</span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 資訊維運中心"
+    },
+    {
+      id: 2,
+      icon: "🏛️",
+      category: "偽冒公務",
+      shortTitle: "子女教育補助加碼",
+      subject: "【急件轉發】行政院核定：本校教職員工子女教育生活津貼加碼撥款清冊",
+      senderName: "人事室福利考核組",
+      senderEmail: "personel-nfu@moe-gov-tw.com",
+      senderClue: "冒充教育部與人事室，但網域結尾為商業 .com，既非 .gov.tw 也非 nfu.edu.tw！",
+      sendTime: "2026/11/20 10:15",
+      timeClue: null,
+      recipient: "faculty@nfu.edu.tw",
+      bodyHtml: `
+        <p><span class="spot" data-reason="校內人事室公文必定具體稱呼『各位教職員同仁』，不會使用模糊的『尊貴的用戶』！">尊貴的用戶您好：</span></p>
+        <p>為因應物價上漲，行政院專案核定發給全體大專教職員工子女加碼生活補助金每人 <b>NT$ 12,000 元</b>。</p>
+        <p><span class="spot" data-reason="公務法定補助皆有完整申請期程，絕不可能『名額有限、當日未登記即充公作廢』！">因專案經費名額有限，請務必於今日 17:00 前回傳撥款資料，逾時視同主動放棄領取資格！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="雙重副檔名惡意執行檔 (.xlsx.exe)，偽裝成 Excel 表格，下載執行會立刻植入木馬！">📎 下載審核名冊與申請表：NFU_Subsidy_2026.xlsx.exe</span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 人事行政處"
+    },
+    {
+      id: 3,
+      icon: "🏥",
+      category: "保健醫療",
+      shortTitle: "體檢報告紅字異常",
+      subject: "【急診重大異常通知】您的校園年度健檢血液檢測出現高度警戒數值！",
+      senderName: "特約健檢中心檢驗科",
+      senderEmail: "report@health-check-tw.xyz",
+      senderClue: "校內健檢通知應由衛保組 (@nfu.edu.tw) 聯繫，此處使用免費可疑的 .xyz 網域！",
+      sendTime: "2026/11/20 11:08",
+      timeClue: null,
+      recipient: "staff@nfu.edu.tw",
+      bodyHtml: `
+        <p>受檢人台端：</p>
+        <p>本院在您日前於虎尾科大受檢的血液常規標本中，檢出<span class="spot" data-reason="正規健檢若有危及生命之異常，醫院必定由醫師或衛保組直接『電話聯繫』，絕不會只發恐嚇 Email！">多項高度腫瘤標記紅字異常，屬急迫性危急值！</span></p>
+        <p><span class="spot" data-reason="要求在 6 小時內線上輸入身分證與健保卡號查詢報告，意圖竊取個人醫療與身分個資！">請於 6 小時內線上登入輸入您的身分證字號與健保卡卡號下載急件報告，以免延誤黃金治療期！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="導向第三方不知名短網址 (.top)，屬於典型假冒醫療報告的個資釣魚網頁！">🏥 立即查閱重大異常檢驗報告 (http://nfu-med-report.top)</span>
+        </p>
+      `,
+      footer: "雲林聯合健康管理中心 檢驗部"
+    },
+    {
+      id: 4,
+      icon: "🚗",
+      category: "違規催繳",
+      shortTitle: "校園車輛違停拖吊",
+      subject: "【最終催繳】您的車輛違反虎科大校園交通管理辦法，即將執行鎖車拖吊",
+      senderName: "總務處駐警隊暨車管組",
+      senderEmail: "parking@nfu-traffic.online",
+      senderClue: "總務處官方信箱應為 @nfu.edu.tw，此處使用外部註冊的 .online 假網址！",
+      sendTime: "2026/11/20 13:05",
+      timeClue: null,
+      recipient: "driver@nfu.edu.tw",
+      bodyHtml: `
+        <p><span class="spot" data-reason="真正的校園違規通知一定會明確列出『車牌號碼、違規時間與地點』，此信完全不敢寫車號！">車主您好（車牌號碼：系統自動比對）：</span></p>
+        <p>校園車牌辨識系統偵測到您的車輛多次違規停放於行政大樓前紅線管制區。</p>
+        <p><span class="spot" data-reason="恐嚇今日下班前不線上刷卡就『直接拖吊至校外保管場』，製造慌張感逼迫付款！">⚠️ 請於今日 17:00 前線上繳清違規處理規費 NT$ 600 元，逾期將逕行鎖車並拖吊至校外保管場！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="校方規費絕不會透過外部網頁要求輸入『信用卡安全碼 CVV』繳費，這是信用卡盜刷陷阱！">💳 線上信用卡繳清 600 元規費 (http://pay-nfu-park.club)</span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 校園安全交通管制中心"
+    },
+    {
+      id: 5,
+      icon: "🏖️",
+      category: "休閒福利",
+      shortTitle: "五星飯店住宿券領取",
+      subject: "【校長特別提撥】虎科大教職員專屬『日月潭五星飯店住宿券 NT$5,000』限量登記",
+      senderName: "教職員福利關懷會",
+      senderEmail: "gift-welfare@nfu-trip.shop",
+      senderClue: "寄件網域為廉價商業網域 .shop，並非國立虎尾科技大學官方網域！",
+      sendTime: "2026/11/20 12:15",
+      timeClue: null,
+      recipient: "faculty@nfu.edu.tw",
+      bodyHtml: `
+        <p>辛勞的虎科大教職員同仁：</p>
+        <p>為慰勞全校同仁推動校務辛勞，校長室特別提撥經費，致贈每位教職員工<span class="spot" data-reason="天下沒有白吃的午餐！以高額『免費 5,000 元五星住宿券』利用貪念誘使點擊！">日月潭五星級渡假酒店 NT$ 5,000 元無門檻現金抵用券！</span></p>
+        <p><span class="spot" data-reason="利用『全校限量 50 組、今晚失效』製造搶購緊迫感，讓人來不及查證真偽！">🔥 全校僅限量 50 組先搶先贏！超過今晚 23:59 未完成綁定，序號將自動作廢！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="要求點連結綁定 LINE 帳號或掃描 QR Code，是近年最猖獗的『LINE 帳號盜用』釣魚手法！">🎁 點此快速登入 LINE 帳號領取 5000 元序號</span>
+        </p>
+      `,
+      footer: "虎尾科技大學 員工福利委員會"
+    },
+    {
+      id: 6,
+      icon: "📰",
+      category: "時事法規",
+      shortTitle: "AI 學術倫理懲處名單",
+      subject: "【教育部專案清查】國立大學生成式 AI 學術倫理違規比對黑名單通知",
+      senderName: "大專學術誠信監督小組",
+      senderEmail: "ethics-audit@moe-edu-tw.info",
+      senderClue: "假冒教育部名義，但網域為 .info，並非政府機關正規的 .gov.tw！",
+      sendTime: "2026/11/20 09:50",
+      timeClue: null,
+      recipient: "professor@nfu.edu.tw",
+      bodyHtml: `
+        <p>各位大專院校教研人員：</p>
+        <p>教育部全面清查各國立大學計畫報告與期刊論文，發現<span class="spot" data-reason="捏造『系統自動比對出高度 AI 抄襲異常』，利用學者最在意的學術聲譽製造焦慮！">貴單位有多筆著作經 AI 偵測系統判定為高度疑似違規生成！</span></p>
+        <p><span class="spot" data-reason="恐嚇『24 小時內未簽署具結書即撤銷未來三年計畫補助』，迫使收件人倉促下載附件！">請於 24 小時內下載比對清單並回傳具結書，逾期未回覆者將直接撤銷未來三年所有研究補助資格！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="副檔名為 .zip.lnk（Windows 捷徑檔），偽裝成壓縮檔，點開會在背景執行惡意腳本病毒！">📎 下載違規比對異常名單：AI_Check_Report.zip.lnk</span>
+        </p>
+      `,
+      footer: "教育部 高等教育學術倫理專案辦公室"
+    },
+    {
+      id: 7,
+      icon: "💰",
+      category: "財經薪資",
+      shortTitle: "計畫薪資退匯重領",
+      subject: "【出納組急件】您本月份專案研究津貼撥款失敗：金融帳戶異常退匯通知",
+      senderName: "校務出納金流中心",
+      senderEmail: "cashier-alert@nfu-bank-tw.com",
+      senderClue: "混雜 nfu 與 bank 字樣的假冒 .com 網域，非總務處出納組 @nfu.edu.tw！",
+      sendTime: "2026/11/20 14:20",
+      timeClue: null,
+      recipient: "assistant@nfu.edu.tw",
+      bodyHtml: `
+        <p>受薪同仁您好：</p>
+        <p>因銀行端系統升級比對不符，您本月份計畫薪資及研究津貼 <b>NT$ 36,800 元</b> 撥款作業遭到退匯。</p>
+        <p><span class="spot" data-reason="荒謬恐嚇！薪資退匯出納組會直接聯繫補登存摺，絕不可能『3 小時內依洗錢防制法充公國庫』！">⚠️ 請務必於 3 小時內完成帳戶重新驗證，逾期款項將依洗錢防制法全額繳回國庫，不得異議！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="極度危險！正規金融與學校出納『絕對不會』在網頁上索取您的『提款卡密碼』！">🏦 點此輸入金融卡號與提款卡密碼重新領款</span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 財務出納組"
+    },
+    {
+      id: 8,
+      icon: "🤫",
+      category: "校園八卦",
+      shortTitle: "高層評鑑錄音外流",
+      subject: "【震撼爆料】內部考績升遷會議爭議錄音檔流出：黑箱名單全公開",
+      senderName: "虎科正義吹哨者聯盟",
+      senderEmail: "whistleblower@nfu-news-leak.xyz",
+      senderClue: "匿名外部 .xyz 免費網域，專門利用八卦好奇心散播惡意木馬檔案！",
+      sendTime: "2026/11/20 12:45",
+      timeClue: null,
+      recipient: "all-staff@nfu.edu.tw",
+      bodyHtml: `
+        <p>關心虎科發展的全體教職員：</p>
+        <p>本校某單位主管於日前考績評審會議中私相授受之未公開錄音檔，已遭內部人員完整備份流出，內含<span class="spot" data-reason="利用『升遷黑箱名單』挑起八卦窺探慾望，讓人在興奮與好奇下忽略檔案安全性！">多名行政與教學人員評分造假之完整名單！</span></p>
+        <p><span class="spot" data-reason="假稱『隨時會被校方高層刪除、僅保留 1 小時』，營造錯過就看不到的心理壓力！">⏳ 雲端連結隨時可能遭校方施壓下架，檔案僅保留至今日 14:00 止，請火速下載備份！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="將 VBScript 病毒偽裝成錄音檔 (.mp3.vbs)，雙擊執行將立刻感染勒索病毒！">🎧 點此播放密件錄音檔 (NFU_Secret_Meeting.mp3.vbs)</span>
+        </p>
+      `,
+      footer: "校園透明監督小組"
+    },
+    {
+      id: 9,
+      icon: "🛡️",
+      category: "新奇科技",
+      shortTitle: "零日漏洞防禦補丁",
+      subject: "【資安紅色警戒】校園網路遭受勒索病毒攻擊，請立即安裝專用防禦補丁",
+      senderName: "校園資安聯防應變中心",
+      senderEmail: "soc-patch@nfu-security.cc",
+      senderClue: "電算中心資安通報必定使用 @nfu.edu.tw，此處為外部註冊的 .cc 假網域！",
+      sendTime: "2026/11/20 15:10",
+      timeClue: null,
+      recipient: "pc-user@nfu.edu.tw",
+      bodyHtml: `
+        <p>緊急通報全體校園網路用戶：</p>
+        <p>微軟今日發布高危險零日漏洞，偵測顯示<span class="spot" data-reason="製造『已有三座校內伺服器遭勒索加密』的假災情，讓使用者恐慌失措！">本校已有三座核心伺服器遭受新型勒索病毒加密綁架！</span></p>
+        <p><span class="spot" data-reason="恐嚇『15 分鐘內不執行程式就切斷電腦網路』，迫使使用者直接執行來路不明的程式！">⚠️ 請於 15 分鐘內下載並執行本校專用修補程式，未完成修補之電腦 IP 將直接予以斷網封鎖！</span></p>
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="真正的系統更新會透過 Windows Update 或校內軟體派送伺服器，絕不會用 Email 寄送 .exe 執行檔！">⚙️ 立即下載執行 NFU_AntiRansom_Patch.exe</span>
+        </p>
+      `,
+      footer: "虎尾科技大學 資訊安全防護小組"
+    }
+  ];
+
+  /* ============================================================
+     3. 九宮格狀態、連線判定與倒數計時邏輯
+     ============================================================ */
+  let boardData = [];          // 當前 9 宮格題目陣列
+  let cellStates = [];         // 'idle' | 'passed' | 'failed'
+  let activeCellIndex = null;  // 目前正在作答的格子索引 (0~8)
+  let foundSpotsCount = 0;
+  let totalSpotsInMail = 0;
+  let timerInterval = null;
+  const QUESTION_TIME = 60;
+  let timeLeft = QUESTION_TIME;
+
+  // 8 條賓果連線組合 (3橫、3直、2斜)
+  const WIN_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // 橫線
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // 直線
+    [0, 4, 8], [2, 4, 6]             // 斜線
+  ];
+
+  // 綁定開始按鈕
+  document.getElementById("btn-start").addEventListener("click", () => {
+    unlockAudio();
+    playCellPassSound();
+    document.getElementById("start-screen").style.display = "none";
+    initNewBoard();
+  });
+
+  // 初始化隨機 9 宮格
+  function initNewBoard() {
+    clearInterval(timerInterval);
+    // 洗牌 9 種不同類型題目
+    boardData = [...phishingScenarios].sort(() => Math.random() - 0.5);
+    cellStates = new Array(9).fill('idle');
+    activeCellIndex = null;
+
+    document.getElementById("celebration-screen").style.display = "none";
+    document.getElementById("result-modal").style.display = "none";
+    stopConfetti();
+
+    showGridView();
+    renderBingoGrid();
+  }
+
+  function showGridView() {
+    clearInterval(timerInterval);
+    document.getElementById("grid-view").style.display = "flex";
+    document.getElementById("mail-view").style.display = "none";
+
+    document.getElementById("timer-box").style.display = "none";
+    document.getElementById("score-box").style.display = "none";
+    document.getElementById("timer-track").style.display = "none";
+    document.getElementById("btn-giveup").style.display = "none";
+
+    document.getElementById("status-badge").textContent = "九宮格選題中";
+    document.getElementById("status-badge").style.background = "#0284c7";
+    document.getElementById("hint-message").innerHTML = "👉 請點擊任一格子進入挑戰，<b>連成一條線（橫、直、斜）</b>即可過關摸彩！";
+  }
+
+  function renderBingoGrid() {
+    const gridEl = document.getElementById("bingo-grid");
+    gridEl.innerHTML = "";
+
+    boardData.forEach((item, idx) => {
+      const state = cellStates[idx];
+      const cell = document.createElement("div");
+      cell.className = "grid-cell";
+
+      if (state === 'passed') {
+        cell.classList.add("passed", "locked");
+      } else if (state === 'failed') {
+        cell.classList.add("failed", "locked");
+      }
+
+      let stampHtml = "";
+      if (state === 'passed') {
+        stampHtml = `<div class="status-stamp">通過</div>`;
+      } else if (state === 'failed') {
+        stampHtml = `<div class="status-stamp">失敗</div>`;
+      }
+
+      cell.innerHTML = `
+        <div class="cell-icon">${item.icon}</div>
+        <div class="cell-text-wrap">
+          <span class="cell-category">${item.category}</span>
+          <div class="cell-title">${item.shortTitle}</div>
+        </div>
+        ${stampHtml}
+      `;
+
+      if (state === 'idle') {
+        cell.addEventListener("click", () => enterCellChallenge(idx));
+      }
+
+      gridEl.appendChild(cell);
+    });
+  }
+
+  // 進入單一格子抓漏挑戰
+  function enterCellChallenge(idx) {
+    unlockAudio();
+    activeCellIndex = idx;
+    const item = boardData[idx];
+
+    document.getElementById("grid-view").style.display = "none";
+    document.getElementById("mail-view").style.display = "flex";
+    document.getElementById("mail-view").scrollTop = 0;
+
+    document.getElementById("timer-box").style.display = "flex";
+    document.getElementById("score-box").style.display = "inline-block";
+    document.getElementById("timer-track").style.display = "block";
+    document.getElementById("btn-giveup").style.display = "flex";
+
+    document.getElementById("status-badge").textContent = `類型：${item.category}`;
+    document.getElementById("status-badge").style.background = "#7c3aed";
+
+    // 組合信件 HTML
+    const senderSpotHtml = `<span class="spot meta-value" data-reason="${item.senderClue}">${item.senderName} &lt;${item.senderEmail}&gt;</span>`;
+    const timeHtml = item.timeClue
+      ? `<span class="spot meta-value" data-reason="${item.timeClue}">${item.sendTime}</span>`
+      : `<span class="meta-value">${item.sendTime}</span>`;
+
+    const cardEl = document.getElementById("mail-card-content");
+    cardEl.innerHTML = `
+      <div class="mail-subject">${item.subject}</div>
+      <div class="mail-meta-box">
+        <div class="meta-item">
+          <span class="meta-label">寄件人：</span>${senderSpotHtml}
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">收件人：</span><span class="meta-value">${item.recipient}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">時間：</span>${timeHtml}
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">類型：</span><span class="meta-value">${item.category}</span>
+        </div>
+      </div>
+      <div class="mail-body">${item.bodyHtml}</div>
+      <div class="mail-footer">${item.footer}</div>
+    `;
+
+    // 計算此封信件總共有幾個可點擊破綻 (3~5個)
+    const spots = cardEl.querySelectorAll(".spot");
+    foundSpotsCount = 0;
+    totalSpotsInMail = spots.length;
+
+    document.getElementById("found-count").textContent = foundSpotsCount;
+    document.getElementById("total-spots").textContent = totalSpotsInMail;
+    document.getElementById("hint-message").innerHTML = `👉 請在 <b>60 秒</b> 內點擊找出信件中隱藏的 <b>${totalSpotsInMail} 處資安破綻</b>！`;
+
+    spots.forEach(spot => {
+      spot.addEventListener("click", function () {
+        unlockAudio();
+        if (this.classList.contains("found") || this.classList.contains("revealed")) return;
+
+        this.classList.add("found");
+        foundSpotsCount++;
+        document.getElementById("found-count").textContent = foundSpotsCount;
+        playSpotFoundSound();
+
+        if (foundSpotsCount >= totalSpotsInMail) {
+          handleCellSuccess();
+        }
+      });
+    });
+
+    startQuestionTimer();
+  }
+
+  function startQuestionTimer() {
+    clearInterval(timerInterval);
+    timeLeft = QUESTION_TIME;
+    updateTimerDisplay();
+
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      updateTimerDisplay();
+
+      // 倒數 20 秒開始出現越來越快的提示聲
+      if (timeLeft <= 20 && timeLeft > 0) {
+        playCountdownTick(timeLeft);
+      }
+
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        handleCellFailure("⏰ 60 秒時間到！未能找出所有破綻，此格子已鎖定為「失敗」。");
+      }
+    }, 1000);
+  }
+
+  function updateTimerDisplay() {
+    const timerText = document.getElementById("timer-text");
+    const timerBox = document.getElementById("timer-box");
+    const timerBar = document.getElementById("timer-bar");
+
+    timerText.textContent = `${timeLeft} 秒`;
+    timerBar.style.width = `${(timeLeft / QUESTION_TIME) * 100}%`;
+
+    if (timeLeft <= 20) {
+      timerBox.classList.add("warning");
+      timerBar.style.backgroundColor = "#ef4444";
+    } else {
+      timerBox.classList.remove("warning");
+      timerBar.style.backgroundColor = "#38bdf8";
+    }
+  }
+
+  function abandonCurrentCell() {
+    clearInterval(timerInterval);
+    handleCellFailure("您已放棄此題，此格子將鎖定為「失敗」且不計入連線。");
+  }
+
+  // 單格挑戰成功
+  function handleCellSuccess() {
+    clearInterval(timerInterval);
+    playCellPassSound();
+    cellStates[activeCellIndex] = 'passed';
+
+    // 檢查是否已經連成一條線
+    const hasWonLine = WIN_LINES.some(line => line.every(idx => cellStates[idx] === 'passed'));
+
+    if (hasWonLine) {
+      setTimeout(() => {
+        triggerBingoCelebration();
+      }, 650);
+    } else {
+      setTimeout(() => {
+        showResultModal(
+          "✅",
+          "本題挑戰「通過」！",
+          `太厲害了！您成功揪出這封【${boardData[activeCellIndex].category}】信件的所有破綻，請返回九宮格繼續完成連線！`,
+          "返回九宮格",
+          () => {
+            closeResultModal();
+            showGridView();
+            renderBingoGrid();
+          }
+        );
+      }, 600);
+    }
+  }
+
+  // 單格挑戰失敗
+  function handleCellFailure(reasonText) {
+    playCellFailSound();
+    cellStates[activeCellIndex] = 'failed';
+
+    // 標出未找到的破綻讓參加者學習
+    document.querySelectorAll(".spot:not(.found)").forEach(s => s.classList.add("revealed"));
+
+    // 檢查是否還有任何一條線有機會連成 (deadlock check)
+    const canStillWin = WIN_LINES.some(line => line.every(idx => cellStates[idx] !== 'failed'));
+
+    setTimeout(() => {
+      if (!canStillWin) {
+        showResultModal(
+          "🔒",
+          "已無連線可能！挑戰結束",
+          `${reasonText}<br><br>由於失敗格子已阻斷所有連線路徑，請點擊下方按鈕重新洗牌再挑戰一次！`,
+          "重新洗牌九宮格",
+          () => {
+            closeResultModal();
+            initNewBoard();
+          }
+        );
+      } else {
+        showResultModal(
+          "❌",
+          "本題挑戰「失敗」",
+          `${reasonText}<br>畫面上已為您標示出漏掉的資安陷阱，請返回九宮格嘗試其他路線連線！`,
+          "返回九宮格",
+          () => {
+            closeResultModal();
+            showGridView();
+            renderBingoGrid();
+          }
+        );
+      }
+    }, 850);
+  }
+
+  function showResultModal(emoji, title, descHtml, btnText, onConfirm) {
+    document.getElementById("modal-emoji").textContent = emoji;
+    document.getElementById("modal-title").textContent = title;
+    document.getElementById("modal-desc").innerHTML = descHtml;
+    const btn = document.getElementById("modal-btn");
+    btn.textContent = btnText;
+    btn.onclick = onConfirm;
+    document.getElementById("result-modal").style.display = "flex";
+  }
+
+  function closeResultModal() {
+    document.getElementById("result-modal").style.display = "none";
+  }
+
+  /* ============================================================
+     4. 連線成功全螢幕慶祝灑花特效 (Confetti)
+     ============================================================ */
+  let confettiAnimId = null;
+  let confettiParticles = [];
+
+  function triggerBingoCelebration() {
+    playBingoWinFanfare();
+    const randomCode = "NFU-" + Math.floor(1000 + Math.random() * 9000);
+    document.getElementById("win-code").textContent = randomCode;
+    document.getElementById("celebration-screen").style.display = "flex";
+    startConfetti();
+  }
+
+  function startConfetti() {
+    const canvas = document.getElementById("confetti-canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = ["#facc15", "#f43f5e", "#38bdf8", "#4ade80", "#a855f7", "#fb923c"];
+    confettiParticles = [];
+
+    for (let i = 0; i < 160; i++) {
+      confettiParticles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height - canvas.height,
+        w: Math.random() * 12 + 6,
+        h: Math.random() * 8 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speedY: Math.random() * 3.5 + 2,
+        speedX: Math.random() * 2 - 1,
+        angle: Math.random() * 360,
+        spin: Math.random() * 6 - 3
+      });
+    }
+
+    function renderConfetti() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      confettiParticles.forEach(p => {
+        p.y += p.speedY;
+        p.x += p.speedX;
+        p.angle += p.spin;
+        if (p.y > canvas.height) {
+          p.y = -20;
+          p.x = Math.random() * canvas.width;
+        }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.angle * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      confettiAnimId = requestAnimationFrame(renderConfetti);
+    }
+
+    renderConfetti();
+  }
+
+  function stopConfetti() {
+    if (confettiAnimId) {
+      cancelAnimationFrame(confettiAnimId);
+      confettiAnimId = null;
+    }
+    const canvas = document.getElementById("confetti-canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function restartWholeGame() {
+    unlockAudio();
+    initNewBoard();
+  }
+
+  window.addEventListener("resize", () => {
+    const canvas = document.getElementById("confetti-canvas");
+    if (canvas && document.getElementById("celebration-screen").style.display === "flex") {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+  });
+</script>
+</body>
+</html>
