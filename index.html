@@ -426,7 +426,7 @@
       word-break: break-all;
     }
 
-    /* ================= 啟動首頁 & 慶祝灑花頁 & 彈窗 ================= */
+    /* ================= 啟動首頁 & 慶祝灑花頁 & 已通關鎖定頁 ================= */
     .overlay-screen {
       display: flex;
       position: fixed;
@@ -447,6 +447,12 @@
     #celebration-screen {
       display: none;
       background: radial-gradient(circle at center, #1e1b4b 0%, #090d16 100%);
+    }
+
+    #already-passed-screen {
+      display: none;
+      background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+      z-index: 10500;
     }
 
     #confetti-canvas {
@@ -471,6 +477,30 @@
       border: 4px solid #facc15;
     }
 
+    .ip-badge {
+      display: inline-block;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid #475569;
+      color: #94a3b8;
+      font-size: 13px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+      font-family: monospace;
+    }
+
+    .ip-badge-light {
+      display: inline-block;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #475569;
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-family: monospace;
+    }
+
     .btn-primary-action {
       background: linear-gradient(90deg, #0284c7, #2563eb);
       color: white;
@@ -485,11 +515,11 @@
       margin-top: 10px;
     }
 
-    .btn-lottery {
-      background: linear-gradient(90deg, #eab308, #f97316);
-      color: #ffffff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
-      box-shadow: 0 10px 25px rgba(249, 115, 22, 0.5);
+    .btn-primary-action:disabled {
+      background: #64748b;
+      box-shadow: none;
+      animation: none;
+      cursor: wait;
     }
 
     .modal-backdrop {
@@ -686,35 +716,55 @@
 </head>
 <body>
 
+<!-- 0. 已過關鎖定畫面（偵測到該 IP 或手機已通關時顯示） -->
+<div class="overlay-screen" id="already-passed-screen">
+  <div class="celebration-card" style="border-color: #16a34a;">
+    <div id="admin-reset-trigger-locked" style="font-size: 60px; margin-bottom: 8px; cursor: pointer;">🏅✅</div>
+    <h2 style="font-size: clamp(22px, 4vw, 28px); font-weight: 900; color: #15803d; margin: 0 0 12px 0;">
+      您已完成過關挑戰！
+    </h2>
+    <p style="font-size: 15px; color: #334155; line-height: 1.65; margin-bottom: 18px;">
+      系統偵測到您的手機或連線 IP <b>已完成通關</b>。<br>
+      為維護活動公平性，每位參加者過關後<b>僅限參與一次</b>，無法重複挑戰。<br>
+      <span style="color: #dc2626; font-weight: 800;">若尚未領獎，請直接向攤位工作人員出示此畫面！</span>
+    </p>
+    <div class="ip-badge-light" id="locked-ip-info">連線 IP 偵測中...</div>
+    <div style="font-size: 12px; color: #64748b; margin-top: 10px;" id="locked-time-info"></div>
+  </div>
+</div>
+
 <!-- 1. 挑戰進入首頁 -->
 <div class="overlay-screen" id="start-screen">
-  <div style="font-size: clamp(44px, 8vh, 68px); margin-bottom: 10px;">🐯🛡️</div>
+  <div id="admin-reset-trigger-start" style="font-size: clamp(44px, 8vh, 68px); margin-bottom: 10px; cursor: pointer;">🐯🛡️</div>
   <h1 style="font-size: clamp(24px, 4.5vw, 38px); margin: 0 0 10px 0; font-weight: 900;">
     資安社交工程九宮格挑戰
   </h1>
-  <p style="font-size: clamp(14px, 2.2vw, 18px); color: #cbd5e1; max-width: 620px; line-height: 1.65; margin-bottom: 24px;">
+  <p style="font-size: clamp(14px, 2.2vw, 18px); color: #cbd5e1; max-width: 620px; line-height: 1.65; margin-bottom: 16px;">
     🎯 <b>挑戰規則：</b>任選九宮格中的校園情境題目，在 <b>60 秒內</b> 點出信件內所有可疑破綻。<br>
-    ⚠️ 失敗格子將被鎖定！只要成功<b>連成任意一條直線（橫、直、斜）</b>，即可獲得現場摸彩資格！
+    ⚠️ 失敗格子將被鎖定！只要成功<b>連成任意一條直線（橫、直、斜）</b>，即可獲得現場摸彩資格！<br>
+    🔒 <b>每人限過關一次</b>（挑戰失敗可繼續重試，直到過關為止）。
   </p>
-  <button class="btn-primary-action" id="btn-start">點擊開始連線挑戰</button>
+  <div class="ip-badge" id="start-ip-display">🔍 正在驗證連線 IP...</div>
+  <br>
+  <button class="btn-primary-action" id="btn-start" disabled>偵測連線中...</button>
 </div>
 
-<!-- 2. 連線成功慶祝灑花頁面 -->
+<!-- 2. 連線成功慶祝灑花頁面（已刪除通關認證碼） -->
 <canvas id="confetti-canvas"></canvas>
 <div class="overlay-screen" id="celebration-screen">
   <div class="celebration-card">
     <div style="font-size: 64px; margin-bottom: 8px;">🎉🏆🎊</div>
-    <h2 style="font-size: clamp(24px, 4vw, 32px); font-weight: 900; color: #b45309; margin: 0 0 10px 0;">
+    <h2 style="font-size: clamp(24px, 4vw, 32px); font-weight: 900; color: #b45309; margin: 0 0 12px 0;">
       賓果連線成功！恭喜過關！
     </h2>
-    <p style="font-size: 16px; color: #334155; line-height: 1.6; margin-bottom: 20px;">
+    <p style="font-size: 16px; color: #334155; line-height: 1.65; margin-bottom: 18px;">
       您已成功識破校園社交工程陷阱並完成連線！<br>
       <b style="color: #dc2626; font-size: 18px;">請向攤位工作人員出示此畫面進行摸彩！</b>
     </p>
-    <div style="background: #fef3c7; border: 2px dashed #f59e0b; border-radius: 12px; padding: 10px; margin-bottom: 20px; font-weight: 800; color: #92400e;">
-      通關認證碼：<span id="win-code">NFU-2026-WIN</span>
-    </div>
-    <button class="btn-primary-action btn-lottery" onclick="restartWholeGame()">下一位挑戰者（重新洗牌）</button>
+    <div class="ip-badge-light" id="win-ip-display">已登記 IP：偵測中</div>
+    <p style="font-size: 13px; color: #64748b; margin-top: 14px; margin-bottom: 0;">
+      ※ 系統已登記您的連線 IP 與通關紀錄，每人限領獎一次。
+    </p>
   </div>
 </div>
 
@@ -777,6 +827,110 @@
 
 <script>
   /* ============================================================
+     0. 手機 IP 偵測與「過關限玩一次」防重複機制
+     ============================================================ */
+  const ENABLE_IP_LOCK = true; // 設為 true 啟用 IP 鎖定（建議參加者用自己 4G/5G 網路；若全場共用同一台 Wi-Fi 分享器可改為 false）
+  const STORAGE_KEY_RECORD = "nfu_bingo_2026_passed_record";
+  let clientIP = "未知 IP";
+
+  // 取得參加者外部 IP（主 API + 備援 API，超時 3 秒避免卡住）
+  async function fetchClientIP() {
+    const fetchWithTimeout = (url, ms = 3000) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), ms);
+      return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+    };
+
+    try {
+      const res = await fetchWithTimeout("https://api.ipify.org?format=json");
+      const data = await res.json();
+      if (data && data.ip) return data.ip;
+    } catch (e) {}
+
+    try {
+      const res = await fetchWithTimeout("https://api.db-ip.com/v2/free/self");
+      const data = await res.json();
+      if (data && data.ipAddress) return data.ipAddress;
+    } catch (e) {}
+
+    return "本地裝置識別碼";
+  }
+
+  // 檢查是否已經過關（只有過關才會鎖定，失敗或未完成皆可繼續挑戰）
+  function checkIfAlreadyPassed(detectedIP) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_RECORD);
+      if (!raw) return null;
+      const record = JSON.parse(raw);
+      if (record && record.passed === true) {
+        if (!ENABLE_IP_LOCK) return record;
+        if (record.ip === detectedIP || record.deviceLocked === true) {
+          return record;
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // 記錄過關狀態與 IP
+  function markUserAsPassed() {
+    const nowStr = new Date().toLocaleString("zh-TW", { hour12: false });
+    const record = {
+      passed: true,
+      deviceLocked: true,
+      ip: clientIP,
+      passedAt: nowStr
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY_RECORD, JSON.stringify(record));
+    } catch (e) {}
+  }
+
+  // 顯示已過關鎖定畫面
+  function showAlreadyPassedScreen(record) {
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("already-passed-screen").style.display = "flex";
+    document.getElementById("locked-ip-info").textContent = `連線 IP：${record.ip || clientIP}`;
+    if (record.passedAt) {
+      document.getElementById("locked-time-info").textContent = `通關時間：${record.passedAt}`;
+    }
+  }
+
+  // 頁面載入時執行 IP 偵測與資格檢查
+  window.addEventListener("DOMContentLoaded", async () => {
+    const startBtn = document.getElementById("btn-start");
+    const ipDisplay = document.getElementById("start-ip-display");
+
+    clientIP = await fetchClientIP();
+    ipDisplay.textContent = `🌐 偵測連線 IP：${clientIP}`;
+
+    const passedRecord = checkIfAlreadyPassed(clientIP);
+    if (passedRecord) {
+      showAlreadyPassedScreen(passedRecord);
+    } else {
+      startBtn.disabled = false;
+      startBtn.textContent = "點擊開始連線挑戰";
+    }
+  });
+
+  // 工作人員隱藏重置密技：連續點擊首頁或鎖定頁圖示 5 下可清除本機過關紀錄
+  let adminTapCount = 0;
+  let adminTapTimer = null;
+  function handleAdminSecretTap() {
+    adminTapCount++;
+    clearTimeout(adminTapTimer);
+    adminTapTimer = setTimeout(() => { adminTapCount = 0; }, 1500);
+    if (adminTapCount >= 5) {
+      adminTapCount = 0;
+      localStorage.removeItem(STORAGE_KEY_RECORD);
+      alert("🔧 已清除本機通關鎖定紀錄，頁面將重新整理！");
+      location.reload();
+    }
+  }
+  document.getElementById("admin-reset-trigger-locked").addEventListener("click", handleAdminSecretTap);
+  document.getElementById("admin-reset-trigger-start").addEventListener("click", handleAdminSecretTap);
+
+  /* ============================================================
      1. Web Audio API 音效與倒數 20 秒漸進加速提示音引擎
      ============================================================ */
   let audioCtx = null;
@@ -810,18 +964,14 @@
     } catch (e) {}
   }
 
-  // 倒數 20 秒漸進加速提示音
   function playCountdownTick(secondsLeft) {
     if (!soundEnabled) return;
     if (secondsLeft > 12) {
-      // 20~13秒：每秒 1 聲提示音
       playBeep(780, 0.12, 'triangle', 0.5, 0);
     } else if (secondsLeft > 6) {
-      // 12~7秒：每秒 2 聲急促音
       playBeep(880, 0.10, 'triangle', 0.6, 0);
       playBeep(880, 0.10, 'triangle', 0.6, 0.45);
     } else {
-      // 6~1秒：每秒 4 聲極速警報音
       [0, 0.22, 0.44, 0.66].forEach(offset => {
         playBeep(1046.5, 0.08, 'sawtooth', 0.65, offset);
       });
@@ -856,7 +1006,7 @@
   }
 
   /* ============================================================
-     2. 9 種不同社交工程類型題庫（每封信皆具不同陳述風格與 4 處破綻）
+     2. 9 種不同社交工程類型題庫
      ============================================================ */
   const phishingScenarios = [
     {
@@ -1062,34 +1212,37 @@
   /* ============================================================
      3. 九宮格狀態、連線判定與倒數計時邏輯
      ============================================================ */
-  let boardData = [];          // 當前 9 宮格題目陣列
-  let cellStates = [];         // 'idle' | 'passed' | 'failed'
-  let activeCellIndex = null;  // 目前正在作答的格子索引 (0~8)
+  let boardData = [];
+  let cellStates = [];
+  let activeCellIndex = null;
   let foundSpotsCount = 0;
   let totalSpotsInMail = 0;
   let timerInterval = null;
   const QUESTION_TIME = 60;
   let timeLeft = QUESTION_TIME;
 
-  // 8 條賓果連線組合 (3橫、3直、2斜)
   const WIN_LINES = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // 橫線
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // 直線
-    [0, 4, 8], [2, 4, 6]             // 斜線
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
   ];
 
-  // 綁定開始按鈕
   document.getElementById("btn-start").addEventListener("click", () => {
+    // 再次雙重確認是否已過關
+    const passedRecord = checkIfAlreadyPassed(clientIP);
+    if (passedRecord) {
+      showAlreadyPassedScreen(passedRecord);
+      return;
+    }
+
     unlockAudio();
     playCellPassSound();
     document.getElementById("start-screen").style.display = "none";
     initNewBoard();
   });
 
-  // 初始化隨機 9 宮格
   function initNewBoard() {
     clearInterval(timerInterval);
-    // 洗牌 9 種不同類型題目
     boardData = [...phishingScenarios].sort(() => Math.random() - 0.5);
     cellStates = new Array(9).fill('idle');
     activeCellIndex = null;
@@ -1156,7 +1309,6 @@
     });
   }
 
-  // 進入單一格子抓漏挑戰
   function enterCellChallenge(idx) {
     unlockAudio();
     activeCellIndex = idx;
@@ -1174,7 +1326,6 @@
     document.getElementById("status-badge").textContent = `類型：${item.category}`;
     document.getElementById("status-badge").style.background = "#7c3aed";
 
-    // 組合信件 HTML
     const senderSpotHtml = `<span class="spot meta-value" data-reason="${item.senderClue}">${item.senderName} &lt;${item.senderEmail}&gt;</span>`;
     const timeHtml = item.timeClue
       ? `<span class="spot meta-value" data-reason="${item.timeClue}">${item.sendTime}</span>`
@@ -1201,7 +1352,6 @@
       <div class="mail-footer">${item.footer}</div>
     `;
 
-    // 計算此封信件總共有幾個可點擊破綻 (3~5個)
     const spots = cardEl.querySelectorAll(".spot");
     foundSpotsCount = 0;
     totalSpotsInMail = spots.length;
@@ -1238,7 +1388,6 @@
       timeLeft--;
       updateTimerDisplay();
 
-      // 倒數 20 秒開始出現越來越快的提示聲
       if (timeLeft <= 20 && timeLeft > 0) {
         playCountdownTick(timeLeft);
       }
@@ -1278,10 +1427,11 @@
     playCellPassSound();
     cellStates[activeCellIndex] = 'passed';
 
-    // 檢查是否已經連成一條線
     const hasWonLine = WIN_LINES.some(line => line.every(idx => cellStates[idx] === 'passed'));
 
     if (hasWonLine) {
+      // 賓果連線成功！立即鎖定該手機與 IP 不可再重複挑戰
+      markUserAsPassed();
       setTimeout(() => {
         triggerBingoCelebration();
       }, 650);
@@ -1302,23 +1452,21 @@
     }
   }
 
-  // 單格挑戰失敗
+  // 單格挑戰失敗（未過關前仍可繼續挑戰）
   function handleCellFailure(reasonText) {
     playCellFailSound();
     cellStates[activeCellIndex] = 'failed';
 
-    // 標出未找到的破綻讓參加者學習
     document.querySelectorAll(".spot:not(.found)").forEach(s => s.classList.add("revealed"));
 
-    // 檢查是否還有任何一條線有機會連成 (deadlock check)
     const canStillWin = WIN_LINES.some(line => line.every(idx => cellStates[idx] !== 'failed'));
 
     setTimeout(() => {
       if (!canStillWin) {
         showResultModal(
           "🔒",
-          "已無連線可能！挑戰結束",
-          `${reasonText}<br><br>由於失敗格子已阻斷所有連線路徑，請點擊下方按鈕重新洗牌再挑戰一次！`,
+          "已無連線可能！本局結束",
+          `${reasonText}<br><br>由於失敗格子已阻斷所有連線路徑，您尚未過關，可點擊下方按鈕重新洗牌再挑戰一次！`,
           "重新洗牌九宮格",
           () => {
             closeResultModal();
@@ -1363,8 +1511,7 @@
 
   function triggerBingoCelebration() {
     playBingoWinFanfare();
-    const randomCode = "NFU-" + Math.floor(1000 + Math.random() * 9000);
-    document.getElementById("win-code").textContent = randomCode;
+    document.getElementById("win-ip-display").textContent = `已登記 IP：${clientIP}`;
     document.getElementById("celebration-screen").style.display = "flex";
     startConfetti();
   }
@@ -1423,11 +1570,6 @@
     const canvas = document.getElementById("confetti-canvas");
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
-
-  function restartWholeGame() {
-    unlockAudio();
-    initNewBoard();
   }
 
   window.addEventListener("resize", () => {
