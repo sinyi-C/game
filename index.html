@@ -823,4 +823,864 @@
   <!-- 狀態提示列 -->
   <div class="hint-bar">
     <div>目前狀態：<span class="theme-badge" id="status-badge">九宮格選題中</span></div>
-    <div id="hint-message">👉 請點擊任一格子進入挑戰，<b>
+    <div id="hint-message">👉 請點擊任一格子進入挑戰，<b>連成一條線（橫、直、斜）</b>即可過關摸彩！</div>
+  </div>
+
+  <!-- 視圖 1：九宮格 -->
+  <div id="grid-view">
+    <div class="bingo-grid" id="bingo-grid"></div>
+  </div>
+
+  <!-- 視圖 2：單封信件抓漏 -->
+  <div id="mail-view">
+    <div class="single-mail-card" id="mail-card-content"></div>
+  </div>
+</div>
+
+<!-- 單題結算 / 死局提醒彈窗 -->
+<div class="modal-backdrop" id="result-modal">
+  <div class="modal-box">
+    <div id="modal-emoji" style="font-size: 52px; margin-bottom: 10px;">✅</div>
+    <h2 id="modal-title" style="margin: 0 0 10px 0; font-size: 24px; color: #0f172a;">本題挑戰通過！</h2>
+    <p id="modal-desc" style="color: #475569; font-size: 16px; line-height: 1.6; margin-bottom: 22px;"></p>
+    <button class="btn-modal" id="modal-btn">返回九宮格</button>
+  </div>
+</div>
+
+<script>
+  /* ============================================================
+     0. 手機 IP 偵測與「過關限玩一次」防重複機制
+     ============================================================ */
+  // 建議設為 false（鎖定手機瀏覽器本身），避免現場多人連同一個 Wi-Fi 或同一座 4G/5G 基地台出口 IP 造成誤鎖別人
+  const ENABLE_IP_LOCK = false;
+  const STORAGE_KEY_RECORD = "nfu_bingo_2026_passed_record";
+  let clientIP = "偵測中";
+
+  async function fetchClientIP() {
+    const fetchWithTimeout = (url, ms = 3000) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), ms);
+      return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
+    };
+
+    try {
+      const res = await fetchWithTimeout("https://www.cloudflare.com/cdn-cgi/trace");
+      const text = await res.text();
+      const match = text.match(/ip=(.+)/);
+      if (match && match[1]) return match[1].trim();
+    } catch (e) {}
+
+    try {
+      const res = await fetchWithTimeout("https://api.ipify.org?format=json");
+      const data = await res.json();
+      if (data && data.ip) return data.ip;
+    } catch (e) {}
+
+    return "行動裝置連線";
+  }
+
+  function checkIfAlreadyPassed(detectedIP) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_RECORD);
+      if (!raw) return null;
+      const record = JSON.parse(raw);
+      if (record && record.passed === true) {
+        if (!ENABLE_IP_LOCK) return record;
+        if (record.ip === detectedIP || record.deviceLocked === true) {
+          return record;
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function markUserAsPassed() {
+    const nowStr = new Date().toLocaleString("zh-TW", { hour12: false });
+    const record = {
+      passed: true,
+      deviceLocked: true,
+      ip: clientIP,
+      passedAt: nowStr
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY_RECORD, JSON.stringify(record));
+    } catch (e) {}
+  }
+
+  function showAlreadyPassedScreen(record) {
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("already-passed-screen").style.display = "flex";
+    document.getElementById("locked-ip-info").textContent = `對外連線 IP：${record.ip || clientIP}`;
+    if (record.passedAt) {
+      document.getElementById("locked-time-info").textContent = `通關時間：${record.passedAt}`;
+    }
+  }
+
+  window.addEventListener("DOMContentLoaded", async () => {
+    const startBtn = document.getElementById("btn-start");
+    const ipDisplay = document.getElementById("start-ip-display");
+
+    clientIP = await fetchClientIP();
+    ipDisplay.textContent = `🌐 對外連線 IP：${clientIP}`;
+
+    const passedRecord = checkIfAlreadyPassed(clientIP);
+    if (passedRecord) {
+      showAlreadyPassedScreen(passedRecord);
+    } else {
+      startBtn.disabled = false;
+      startBtn.textContent = "點擊開始連線挑戰";
+    }
+  });
+
+  // 工作人員隱藏重置密技：連續快速點擊首頁或鎖定頁圖示 5 下可清除本機過關紀錄
+  let adminTapCount = 0;
+  let adminTapTimer = null;
+  function handleAdminSecretTap() {
+    adminTapCount++;
+    clearTimeout(adminTapTimer);
+    adminTapTimer = setTimeout(() => { adminTapCount = 0; }, 1500);
+    if (adminTapCount >= 5) {
+      adminTapCount = 0;
+      localStorage.removeItem(STORAGE_KEY_RECORD);
+      alert("🔧 已清除本機通關鎖定紀錄，頁面將重新整理！");
+      location.reload();
+    }
+  }
+  document.getElementById("admin-reset-trigger-locked").addEventListener("click", handleAdminSecretTap);
+  document.getElementById("admin-reset-trigger-start").addEventListener("click", handleAdminSecretTap);
+
+  /* ============================================================
+     1. Web Audio API 音效與倒數 20 秒漸進加速提示音引擎
+     ============================================================ */
+  let audioCtx = null;
+  let soundEnabled = true;
+
+  function unlockAudio() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function playBeep(freq, duration, type = 'sine', vol = 0.45, delay = 0) {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+      unlockAudio();
+      const startTime = audioCtx.currentTime + delay;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(vol, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    } catch (e) {}
+  }
+
+  function playCountdownTick(secondsLeft) {
+    if (!soundEnabled) return;
+    if (secondsLeft > 12) {
+      playBeep(780, 0.12, 'triangle', 0.5, 0);
+    } else if (secondsLeft > 6) {
+      playBeep(880, 0.10, 'triangle', 0.6, 0);
+      playBeep(880, 0.10, 'triangle', 0.6, 0.45);
+    } else {
+      [0, 0.22, 0.44, 0.66].forEach(offset => {
+        playBeep(1046.5, 0.08, 'sawtooth', 0.65, offset);
+      });
+    }
+  }
+
+  function playSpotFoundSound() {
+    playBeep(659.25, 0.12, 'sine', 0.5, 0);
+    playBeep(987.77, 0.22, 'sine', 0.5, 0.09);
+  }
+
+  function playCellPassSound() {
+    [523.25, 659.25, 783.99].forEach((f, i) => playBeep(f, 0.2, 'triangle', 0.5, i * 0.09));
+  }
+
+  function playCellFailSound() {
+    playBeep(240, 0.25, 'sawtooth', 0.55, 0);
+    playBeep(180, 0.35, 'sawtooth', 0.55, 0.26);
+  }
+
+  function playBingoWinFanfare() {
+    const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+    const times = [0, 0.12, 0.24, 0.36, 0.52, 0.66];
+    notes.forEach((f, idx) => playBeep(f, 0.32, 'triangle', 0.6, times[idx]));
+  }
+
+  function toggleSound() {
+    unlockAudio();
+    soundEnabled = !soundEnabled;
+    document.getElementById("sound-icon").textContent = soundEnabled ? "🔊" : "🔇";
+    document.getElementById("sound-text").textContent = soundEnabled ? "音效開" : "靜音";
+  }
+
+  /* ============================================================
+     內嵌 SVG 模擬圖片產生器（用於「圖片連結」型態破綻，無外部斷圖風險）
+     ============================================================ */
+  function createSvgDataUri(svgMarkup) {
+    return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgMarkup.trim());
+  }
+
+  // 圖片 1（第 2 題）：偽造行政院/教育部「一鍵下載補助申請書」按鈕圖片
+  const IMG_FAKE_GOV_BUTTON = createSvgDataUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="440" height="96" viewBox="0 0 440 96">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#047857"/>
+          <stop offset="100%" stop-color="#059669"/>
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="436" height="92" rx="14" fill="url(#g1)" stroke="#a7f3d0" stroke-width="2"/>
+      <circle cx="48" cy="48" r="24" fill="#ffffff" fill-opacity="0.2"/>
+      <text x="48" y="55" font-size="24" text-anchor="middle" fill="#ffffff">📥</text>
+      <text x="90" y="42" font-family="sans-serif" font-size="19" font-weight="bold" fill="#ffffff">行政院專案補助系統｜點此下載清冊</text>
+      <text x="90" y="68" font-family="monospace" font-size="13" fill="#d1fae5">連結導向：http://tw-moe-subsidy.vip/form.exe</text>
+    </svg>
+  `);
+
+  // 圖片 2（第 4 題）：偽造駐警隊「線上掃碼繳納違規罰鍰」QR Code 圖片
+  const IMG_FAKE_QR_PAY = createSvgDataUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="420" height="145" viewBox="0 0 420 145">
+      <rect x="2" y="2" width="416" height="141" rx="14" fill="#fff1f2" stroke="#fda4af" stroke-width="2"/>
+      <rect x="18" y="18" width="108" height="108" rx="8" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
+      <!-- 模擬 QR Code 定位點與方塊 -->
+      <rect x="28" y="28" width="24" height="24" fill="none" stroke="#0f172a" stroke-width="4"/>
+      <rect x="34" y="34" width="12" height="12" fill="#0f172a"/>
+      <rect x="92" y="28" width="24" height="24" fill="none" stroke="#0f172a" stroke-width="4"/>
+      <rect x="98" y="34" width="12" height="12" fill="#0f172a"/>
+      <rect x="28" y="92" width="24" height="24" fill="none" stroke="#0f172a" stroke-width="4"/>
+      <rect x="34" y="98" width="12" height="12" fill="#0f172a"/>
+      <rect x="64" y="32" width="10" height="10" fill="#0f172a"/>
+      <rect x="60" y="56" width="14" height="14" fill="#dc2626"/>
+      <rect x="82" y="64" width="12" height="12" fill="#0f172a"/>
+      <rect x="62" y="84" width="16" height="10" fill="#0f172a"/>
+      <rect x="90" y="90" width="22" height="22" fill="#0f172a"/>
+      <text x="142" y="44" font-family="sans-serif" font-size="17" font-weight="bold" fill="#9f1239">📱 掃描或點擊 QR Code 立即繳費</text>
+      <text x="142" y="70" font-family="sans-serif" font-size="14" fill="#334155">支援信用卡 / 行動支付免手續費</text>
+      <text x="142" y="94" font-family="monospace" font-size="12" fill="#be123c">http://pay-nfu-park.club/card-auth</text>
+      <rect x="142" y="104" width="160" height="24" rx="6" fill="#e11d48"/>
+      <text x="222" y="120" font-family="sans-serif" font-size="12" font-weight="bold" text-anchor="middle" fill="#ffffff">點擊圖片開啟刷卡頁面 ➔</text>
+    </svg>
+  `);
+
+  // 圖片 3（第 8 題）：偽造「雲端機密會議錄音檔播放器」圖片連結
+  const IMG_FAKE_AUDIO_PLAYER = createSvgDataUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="440" height="110" viewBox="0 0 440 110">
+      <rect x="2" y="2" width="436" height="106" rx="14" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
+      <circle cx="52" cy="55" r="26" fill="#3b82f6"/>
+      <polygon points="46,43 46,67 66,55" fill="#ffffff"/>
+      <text x="94" y="42" font-family="sans-serif" font-size="16" font-weight="bold" fill="#f8fafc">🔊 考績評審會議_私密錄音檔.mp3 (14:28)</text>
+      <rect x="94" y="54" width="315" height="8" rx="4" fill="#475569"/>
+      <rect x="94" y="54" width="115" height="8" rx="4" fill="#38bdf8"/>
+      <circle cx="209" cy="58" r="7" fill="#ffffff"/>
+      <text x="94" y="84" font-family="monospace" font-size="12" fill="#94a3b8">點擊圖片播放或下載：NFU_Secret_Meeting.mp3.vbs</text>
+    </svg>
+  `);
+
+  /* ============================================================
+     2. 9 種不同社交工程類型題庫
+        規則：
+        (1) 每一題嚴格只有 2 處錯誤 (spot)
+        (2) 9 題共 18 處錯誤類型完全不重複（含寄件者、時間、內文、連結、圖片連結）
+     ============================================================ */
+  const phishingScenarios = [
+    {
+      id: 1,
+      icon: "📧",
+      category: "模擬社交工程",
+      shortTitle: "校園信箱停權通知",
+      subject: "【系統緊急告警】您的 NFU mail 空間已爆滿，收信功能已遭伺服器暫停",
+      senderName: "虎科大電子計算機中心",
+      senderEmail: "webmail-admin@nfu-edu-tw.org",
+      // 錯誤 1：【寄件者】偽造外部 .org 網域
+      senderClue: "【破綻類型：偽造寄件者網域】虎尾科大官方網域為 nfu.edu.tw，此處使用偽造的 .org 外部網域！",
+      sendTime: "2026/11/20 09:30",
+      timeClue: null,
+      recipient: "user@nfu.edu.tw",
+      bodyHtml: `
+        <p>親愛的 NFU 郵件用戶您好：</p>
+        <p>系統檢測到您的校園電子信箱容量已達 <b>99.9%</b>，目前已有 4 封重要公務公文遭伺服器退回。</p>
+        <!-- 錯誤 2：【內文】限時刪除帳號恐嚇 -->
+        <p><span class="spot" data-reason="【破綻類型：限時刪帳恐嚇】利用『2小時內永久刪除帳號與信件』製造高度恐慌，逼迫收件人失去戒心！">⚠️ 警告：請務必於收到本信 2 小時內完成空間擴充，逾期系統將強制註銷帳號並清空所有歷史信件！</span></p>
+        <p>如有疑問請洽校內分機 3100 諮詢。</p>
+      `,
+      footer: "國立虎尾科技大學 電子計算機中心"
+    },
+    {
+      id: 2,
+      icon: "🏛️",
+      category: "偽冒公務",
+      shortTitle: "子女教育補助加碼",
+      subject: "【急件轉發】行政院核定：本校教職員工子女教育生活津貼加碼撥款清冊",
+      senderName: "人事室",
+      senderEmail: "personnel@nfu.edu.tw",
+      senderClue: null,
+      sendTime: "2026/11/20 10:15",
+      timeClue: null,
+      recipient: "faculty@nfu.edu.tw",
+      bodyHtml: `
+        <!-- 錯誤 3：【內文】非專屬模糊稱謂 -->
+        <p><span class="spot" data-reason="【破綻類型：模糊泛稱非專屬稱謂】校內人事室公文必定具體稱呼『各位教職員同仁』，不會使用一般商業網站的『尊貴的用戶』！">尊貴的用戶您好：</span></p>
+        <p>為因應物價上漲，行政院專案核定發給全體大專教職員工子女加碼生活補助金每人 <b>NT$ 12,000 元</b>，請下載下列專案清冊確認名單：</p>
+        <!-- 錯誤 4：【圖片連結】偽裝成官方下載按鈕的圖片連結 -->
+        <p style="text-align:center;">
+          <span class="spot spot-img-box" data-reason="【破綻類型：惡意圖片按鈕連結】將惡意執行檔 (.exe) 偽裝成官方下載按鈕圖片，誘導點擊直接下載病毒！">
+            <img src="${IMG_FAKE_GOV_BUTTON}" alt="行政院專案補助下載圖片連結">
+          </span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 人事室"
+    },
+    {
+      id: 3,
+      icon: "🏥",
+      category: "保健醫療",
+      shortTitle: "體檢報告紅字異常",
+      subject: "【急診重大異常通知】您的校園年度健檢血液檢測出現高度警戒數值！",
+      senderName: "雲林聯合健檢中心",
+      senderEmail: "service@yunlin-med.org.tw",
+      senderClue: null,
+      sendTime: "2026/11/20 11:08",
+      timeClue: null,
+      recipient: "staff@nfu.edu.tw",
+      bodyHtml: `
+        <p>受檢人台端：</p>
+        <p>本院在您日前於虎尾科大受檢的血液常規標本中，檢出多項異常紅字，屬急迫性危急值！</p>
+        <!-- 錯誤 5：【內文】索取敏感身分證與健保卡號 -->
+        <p><span class="spot" data-reason="【破綻類型：索取敏感身分個資】正規醫療院所若有危及生命異常會直接電話聯繫，絕不會要求線上輸入『身分證與健保卡號』！">請立即線上輸入您的身分證字號與健保卡卡號進行身分核對，以免延誤黃金治療期！</span></p>
+        <!-- 錯誤 6：【連結】免費 .xyz 可疑短網址 -->
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="【破綻類型：可疑 .xyz 釣魚短網址】使用廉價且高風險的 .xyz 網域偽裝醫療報告查詢平台，竊取個人醫療與身分資料！">🏥 立即查閱重大異常檢驗報告 (http://nfu-med-report.xyz)</span>
+        </p>
+      `,
+      footer: "雲林聯合健檢中心"
+    },
+    {
+      id: 4,
+      icon: "🚗",
+      category: "違規催繳",
+      shortTitle: "校園車輛違停拖吊",
+      subject: "【最終催繳】您的車輛違反虎科大校園交通管理辦法，即將執行鎖車拖吊",
+      senderName: "總務處駐警隊",
+      senderEmail: "guard@nfu.edu.tw",
+      senderClue: null,
+      sendTime: "2026/11/20 13:05",
+      timeClue: null,
+      recipient: "driver@nfu.edu.tw",
+      bodyHtml: `
+        <!-- 錯誤 7：【內文】不敢列出具體車牌號碼 -->
+        <p><span class="spot" data-reason="【破綻類型：缺乏具體違規明細】真正的校園違規通知一定會明確列出『車牌號碼、違規時間與地點』，群發釣魚信完全不敢寫車號！">車主您好（車牌號碼：系統自動比對）：</span></p>
+        <p>校園車牌辨識系統偵測到您的車輛違規停放於行政大樓前紅線管制區，請於今日 17:00 前繳清違規處理規費 NT$ 600 元：</p>
+        <!-- 錯誤 8：【圖片連結】假冒線上刷卡繳費 QR Code 圖片 -->
+        <p style="text-align:center;">
+          <span class="spot spot-img-box" data-reason="【破綻類型：假繳費 QR Code 圖片】校方規費絕不會透過外部網頁或圖片 QR Code 要求輸入信用卡資料，這是近年常見的 Quishing（二維碼釣魚）盜刷陷阱！">
+            <img src="${IMG_FAKE_QR_PAY}" alt="線上刷卡繳費 QR Code 圖片">
+          </span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 駐警隊"
+    },
+    {
+      id: 5,
+      icon: "🏖️",
+      category: "休閒福利",
+      shortTitle: "五星飯店住宿券領取",
+      subject: "【特別提撥】虎科大教職員專屬『日月潭五星飯店住宿券 NT$5,000』限量登記",
+      senderName: "教職員福利委員會",
+      senderEmail: "welfare@nfu.edu.tw",
+      senderClue: null,
+      sendTime: "2026/11/20 12:15",
+      timeClue: null,
+      recipient: "faculty@nfu.edu.tw",
+      bodyHtml: `
+        <p>辛勞的虎科大教職員同仁：</p>
+        <!-- 錯誤 9：【內文】高額免費好康利誘 -->
+        <p>為慰勞全校同仁推動校務辛勞，特別提撥經費，致贈每位教職員工<span class="spot" data-reason="【破綻類型：不合理高額免費好康利誘】天下沒有白吃的午餐！以『免費 5,000 元五星住宿券』利用貪念誘使點擊！">日月潭五星級渡假酒店 NT$ 5,000 元無門檻現金抵用券！</span></p>
+        <!-- 錯誤 10：【連結】誘導綁定 LINE 帳號 -->
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="【破綻類型：誘導綁定第三方通訊帳號】要求點連結輸入 LINE 帳密或簡訊驗證碼，是近年最猖獗的『LINE 帳號盜用』釣魚手法！">🎁 點此快速登入綁定 LINE 帳號領取 5000 元序號</span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 福利委員會"
+    },
+    {
+      id: 6,
+      icon: "📰",
+      category: "時事法規",
+      shortTitle: "AI 學術倫理懲處名單",
+      subject: "【教育部專案清查】國立大學生成式 AI 學術倫理違規比對黑名單通知",
+      senderName: "高等教育學術倫理辦公室",
+      senderEmail: "ethics-audit@moe-edu-tw.info",
+      // 錯誤 11：【寄件者】假冒政府機關使用 .info 網域
+      senderClue: "【破綻類型：假冒政府機關網域】假冒教育部名義發信，但網域結尾為一般商業註冊的 .info，並非政府機關正規的 .gov.tw！",
+      sendTime: "2026/11/20 09:50",
+      timeClue: null,
+      recipient: "professor@nfu.edu.tw",
+      bodyHtml: `
+        <p>各位大專院校教研人員：</p>
+        <p>教育部全面清查各國立大學計畫報告與期刊論文，發現貴單位有多筆著作經 AI 偵測系統判定為高度疑似違規生成，請於 24 小時內下載比對清單確認：</p>
+        <!-- 錯誤 12：【連結】雙重副檔名 .zip.lnk 捷徑病毒 -->
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="【破綻類型：雙重副檔名惡意捷徑 (.zip.lnk)】表面偽裝成壓縮檔，實際副檔名為 Windows 捷徑 (.lnk)，點開會在背景執行惡意腳本病毒！">📎 下載違規比對異常名單：AI_Check_Report.zip.lnk</span>
+        </p>
+      `,
+      footer: "高等教育學術倫理專案辦公室"
+    },
+    {
+      id: 7,
+      icon: "💰",
+      category: "財經薪資",
+      shortTitle: "計畫薪資退匯重領",
+      subject: "【出納組急件】您本月份專案研究津貼撥款失敗：金融帳戶異常退匯通知",
+      senderName: "總務處出納組",
+      senderEmail: "cashier@nfu.edu.tw",
+      senderClue: null,
+      sendTime: "2026/11/20 03:42 (凌晨異常發信)",
+      // 錯誤 13：【時間】凌晨三點多人工發信異常
+      timeClue: "【破綻類型：非上班時間異常發信】學校行政單位（出納組）不會在凌晨 3 點 42 分寄發薪資異常通知要求教職員線上操作！",
+      recipient: "assistant@nfu.edu.tw",
+      bodyHtml: `
+        <p>受薪同仁您好：</p>
+        <p>因銀行端系統升級比對不符，您本月份計畫薪資及研究津貼 <b>NT$ 36,800 元</b> 撥款作業遭到退匯，請立即重新驗證金融帳戶以利補發：</p>
+        <!-- 錯誤 14：【連結】網頁索取提款卡密碼 -->
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="【破綻類型：索取提款卡/網銀密碼】正規金融機構與學校出納『絕對不會』在網頁上索取您的『提款卡密碼』，這是金融盜領陷阱！">🏦 點此輸入金融卡號與提款卡密碼重新領款</span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 出納組"
+    },
+    {
+      id: 8,
+      icon: "🤫",
+      category: "校園八卦",
+      shortTitle: "評鑑錄音外流",
+      subject: "【震撼爆料】內部考績升遷會議爭議錄音檔流出：黑箱名單全公開",
+      senderName: "校園匿名吹哨者",
+      senderEmail: "whistleblower@proton-mail-leak.com",
+      senderClue: null,
+      sendTime: "2026/11/20 12:45",
+      timeClue: null,
+      recipient: "all-staff@nfu.edu.tw",
+      bodyHtml: `
+        <p>關心虎科發展的全體教職員：</p>
+        <!-- 錯誤 15：【內文】利用八卦與窺探心理誘騙 -->
+        <p>本校某單位主管於日前考績評審會議中私相授受之未公開錄音檔已流出，內含<span class="spot" data-reason="【破綻類型：利用八卦好奇心誘騙點擊】駭客常以『內部黑箱名單、薪資外流』挑起窺探慾望，讓人在興奮與好奇下忽略檔案安全性！">多名行政與教學人員評分造假之完整名單！</span></p>
+        <!-- 錯誤 16：【圖片連結】偽裝成雲端播放器圖片且暗藏 .mp3.vbs 病毒腳本 -->
+        <p style="text-align:center;">
+          <span class="spot spot-img-box" data-reason="【破綻類型：假播放器圖片連結與 .vbs 腳本病毒】看似雲端音訊播放器截圖，實際點擊會下載 VBScript 病毒程式 (.mp3.vbs)，執行將感染勒索病毒！">
+            <img src="${IMG_FAKE_AUDIO_PLAYER}" alt="雲端錄音檔播放器圖片連結">
+          </span>
+        </p>
+      `,
+      footer: "校園匿名吹哨者"
+    },
+    {
+      id: 9,
+      icon: "🛡️",
+      category: "新奇科技",
+      shortTitle: "零日漏洞防禦補丁",
+      subject: "【資安紅色警戒】校園網路遭受勒索病毒攻擊，請立即安裝專用防禦補丁",
+      senderName: "電子計算機中心",
+      senderEmail: "soc@nfu.edu.tw",
+      senderClue: null,
+      sendTime: "2026/11/20 15:10",
+      timeClue: null,
+      recipient: "cc@nfu.edu.tw",
+      bodyHtml: `
+        <p>緊急通報全體校園網路用戶：</p>
+        <!-- 錯誤 17：【內文】捏造假災情製造集體恐慌 -->
+        <p>微軟今日發布高危險零日漏洞，偵測顯示<span class="spot" data-reason="【破綻類型：捏造假災情製造集體恐慌】謊稱『已有三座校內伺服器遭勒索加密』，誘導使用者在驚慌中未經查證即執行未知程式！">本校已有三座核心伺服器遭受新型勒索病毒加密綁架！</span></p>
+        <!-- 錯誤 18：【連結】透過 Email 直接寄送 .exe 執行檔 -->
+        <p style="text-align:center;">
+          <span class="spot cta-fake-btn" data-reason="【破綻類型：透過 Email 散播 .exe 修補執行檔】真正的系統更新會透過 Windows Update 或校內軟體派送系統進行，絕不會用 Email 附件或連結要求直接執行 .exe 檔！">⚙️ 立即下載執行 NFU_AntiRansom_Patch.exe</span>
+        </p>
+      `,
+      footer: "國立虎尾科技大學 電子計算機中心"
+    }
+  ];
+
+  /* ============================================================
+     3. 九宮格狀態、連線判定與倒數計時邏輯
+     ============================================================ */
+  let boardData = [];
+  let cellStates = [];
+  let activeCellIndex = null;
+  let foundSpotsCount = 0;
+  let totalSpotsInMail = 0;
+  let timerInterval = null;
+  const QUESTION_TIME = 60;
+  let timeLeft = QUESTION_TIME;
+
+  const WIN_LINES = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+
+  document.getElementById("btn-start").addEventListener("click", () => {
+    const passedRecord = checkIfAlreadyPassed(clientIP);
+    if (passedRecord) {
+      showAlreadyPassedScreen(passedRecord);
+      return;
+    }
+
+    unlockAudio();
+    playCellPassSound();
+    document.getElementById("start-screen").style.display = "none";
+    initNewBoard();
+  });
+
+  function initNewBoard() {
+    clearInterval(timerInterval);
+    boardData = [...phishingScenarios].sort(() => Math.random() - 0.5);
+    cellStates = new Array(9).fill('idle');
+    activeCellIndex = null;
+
+    document.getElementById("celebration-screen").style.display = "none";
+    document.getElementById("result-modal").style.display = "none";
+    stopConfetti();
+
+    showGridView();
+    renderBingoGrid();
+  }
+
+  function showGridView() {
+    clearInterval(timerInterval);
+    document.getElementById("grid-view").style.display = "flex";
+    document.getElementById("mail-view").style.display = "none";
+
+    document.getElementById("timer-box").style.display = "none";
+    document.getElementById("score-box").style.display = "none";
+    document.getElementById("timer-track").style.display = "none";
+    document.getElementById("btn-giveup").style.display = "none";
+
+    document.getElementById("status-badge").textContent = "九宮格選題中";
+    document.getElementById("status-badge").style.background = "#0284c7";
+    document.getElementById("hint-message").innerHTML = "👉 請點擊任一格子進入挑戰，<b>連成一條線（橫、直、斜）</b>即可過關摸彩！";
+  }
+
+  function renderBingoGrid() {
+    const gridEl = document.getElementById("bingo-grid");
+    gridEl.innerHTML = "";
+
+    boardData.forEach((item, idx) => {
+      const state = cellStates[idx];
+      const cell = document.createElement("div");
+      cell.className = "grid-cell";
+
+      if (state === 'passed') {
+        cell.classList.add("passed", "locked");
+      } else if (state === 'failed') {
+        cell.classList.add("failed", "locked");
+      }
+
+      let stampHtml = "";
+      if (state === 'passed') {
+        stampHtml = `<div class="status-stamp">通過</div>`;
+      } else if (state === 'failed') {
+        stampHtml = `<div class="status-stamp">失敗</div>`;
+      }
+
+      cell.innerHTML = `
+        <div class="cell-icon">${item.icon}</div>
+        <div class="cell-text-wrap">
+          <span class="cell-category">${item.category}</span>
+          <div class="cell-title">${item.shortTitle}</div>
+        </div>
+        ${stampHtml}
+      `;
+
+      if (state === 'idle') {
+        cell.addEventListener("click", () => enterCellChallenge(idx));
+      }
+
+      gridEl.appendChild(cell);
+    });
+  }
+
+  function enterCellChallenge(idx) {
+    unlockAudio();
+    activeCellIndex = idx;
+    const item = boardData[idx];
+
+    document.getElementById("grid-view").style.display = "none";
+    document.getElementById("mail-view").style.display = "flex";
+    document.getElementById("mail-view").scrollTop = 0;
+
+    document.getElementById("timer-box").style.display = "flex";
+    document.getElementById("score-box").style.display = "inline-block";
+    document.getElementById("timer-track").style.display = "block";
+    document.getElementById("btn-giveup").style.display = "flex";
+
+    document.getElementById("status-badge").textContent = `類型：${item.category}`;
+    document.getElementById("status-badge").style.background = "#7c3aed";
+
+    // 若 senderClue 為 null 則該欄位為正常不可點選；若有值則為可點擊破綻
+    const senderHtml = item.senderClue
+      ? `<span class="spot meta-value" data-reason="${item.senderClue}">${item.senderName} &lt;${item.senderEmail}&gt;</span>`
+      : `<span class="meta-value">${item.senderName} &lt;${item.senderEmail}&gt;</span>`;
+
+    // 若 timeClue 為 null 則時間欄位為正常；若有值則為可點擊破綻
+    const timeHtml = item.timeClue
+      ? `<span class="spot meta-value" data-reason="${item.timeClue}">${item.sendTime}</span>`
+      : `<span class="meta-value">${item.sendTime}</span>`;
+
+    const cardEl = document.getElementById("mail-card-content");
+    cardEl.innerHTML = `
+      <div class="mail-subject">${item.subject}</div>
+      <div class="mail-meta-box">
+        <div class="meta-item">
+          <span class="meta-label">寄件人：</span>${senderHtml}
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">收件人：</span><span class="meta-value">${item.recipient}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">時間：</span>${timeHtml}
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">類型：</span><span class="meta-value">${item.category}</span>
+        </div>
+      </div>
+      <div class="mail-body">${item.bodyHtml}</div>
+      <div class="mail-footer">${item.footer}</div>
+    `;
+
+    // 每題固定 2 處可點擊破綻
+    const spots = cardEl.querySelectorAll(".spot");
+    foundSpotsCount = 0;
+    totalSpotsInMail = spots.length;
+
+    document.getElementById("found-count").textContent = foundSpotsCount;
+    document.getElementById("total-spots").textContent = totalSpotsInMail;
+    document.getElementById("hint-message").innerHTML = `👉 請在 <b>60 秒</b> 內點擊找出信件中隱藏的 <b>${totalSpotsInMail} 處資安破綻</b>！`;
+
+    spots.forEach(spot => {
+      spot.addEventListener("click", function () {
+        unlockAudio();
+        if (this.classList.contains("found") || this.classList.contains("revealed")) return;
+
+        this.classList.add("found");
+        foundSpotsCount++;
+        document.getElementById("found-count").textContent = foundSpotsCount;
+        playSpotFoundSound();
+
+        if (foundSpotsCount >= totalSpotsInMail) {
+          handleCellSuccess();
+        }
+      });
+    });
+
+    startQuestionTimer();
+  }
+
+  function startQuestionTimer() {
+    clearInterval(timerInterval);
+    timeLeft = QUESTION_TIME;
+    updateTimerDisplay();
+
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      updateTimerDisplay();
+
+      if (timeLeft <= 20 && timeLeft > 0) {
+        playCountdownTick(timeLeft);
+      }
+
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        handleCellFailure("⏰ 60 秒時間到！未能找出所有破綻，此格子已鎖定為「失敗」。");
+      }
+    }, 1000);
+  }
+
+  function updateTimerDisplay() {
+    const timerText = document.getElementById("timer-text");
+    const timerBox = document.getElementById("timer-box");
+    const timerBar = document.getElementById("timer-bar");
+
+    timerText.textContent = `${timeLeft} 秒`;
+    timerBar.style.width = `${(timeLeft / QUESTION_TIME) * 100}%`;
+
+    if (timeLeft <= 20) {
+      timerBox.classList.add("warning");
+      timerBar.style.backgroundColor = "#ef4444";
+    } else {
+      timerBox.classList.remove("warning");
+      timerBar.style.backgroundColor = "#38bdf8";
+    }
+  }
+
+  function abandonCurrentCell() {
+    clearInterval(timerInterval);
+    handleCellFailure("您已放棄此題，此格子將鎖定為「失敗」且不計入連線。");
+  }
+
+  function handleCellSuccess() {
+    clearInterval(timerInterval);
+    playCellPassSound();
+    cellStates[activeCellIndex] = 'passed';
+
+    const hasWonLine = WIN_LINES.some(line => line.every(idx => cellStates[idx] === 'passed'));
+
+    if (hasWonLine) {
+      markUserAsPassed();
+      setTimeout(() => {
+        triggerBingoCelebration();
+      }, 650);
+    } else {
+      setTimeout(() => {
+        showResultModal(
+          "✅",
+          "本題挑戰「通過」！",
+          `太厲害了！您成功揪出這封【${boardData[activeCellIndex].category}】信件的 2 處破綻，請返回九宮格繼續完成連線！`,
+          "返回九宮格",
+          () => {
+            closeResultModal();
+            showGridView();
+            renderBingoGrid();
+          }
+        );
+      }, 600);
+    }
+  }
+
+  function handleCellFailure(reasonText) {
+    playCellFailSound();
+    cellStates[activeCellIndex] = 'failed';
+
+    document.querySelectorAll(".spot:not(.found)").forEach(s => s.classList.add("revealed"));
+
+    const canStillWin = WIN_LINES.some(line => line.every(idx => cellStates[idx] !== 'failed'));
+
+    setTimeout(() => {
+      if (!canStillWin) {
+        showResultModal(
+          "🔒",
+          "已無連線可能！本局結束",
+          `${reasonText}<br><br>由於失敗格子已阻斷所有連線路徑，您尚未過關，可點擊下方按鈕重新洗牌再挑戰一次！`,
+          "重新洗牌九宮格",
+          () => {
+            closeResultModal();
+            initNewBoard();
+          }
+        );
+      } else {
+        showResultModal(
+          "❌",
+          "本題挑戰「失敗」",
+          `${reasonText}<br>畫面上已為您標示出漏掉的資安陷阱，請返回九宮格嘗試其他路線連線！`,
+          "返回九宮格",
+          () => {
+            closeResultModal();
+            showGridView();
+            renderBingoGrid();
+          }
+        );
+      }
+    }, 850);
+  }
+
+  function showResultModal(emoji, title, descHtml, btnText, onConfirm) {
+    document.getElementById("modal-emoji").textContent = emoji;
+    document.getElementById("modal-title").textContent = title;
+    document.getElementById("modal-desc").innerHTML = descHtml;
+    const btn = document.getElementById("modal-btn");
+    btn.textContent = btnText;
+    btn.onclick = onConfirm;
+    document.getElementById("result-modal").style.display = "flex";
+  }
+
+  function closeResultModal() {
+    document.getElementById("result-modal").style.display = "none";
+  }
+
+  /* ============================================================
+     4. 連線成功全螢幕慶祝灑花特效 (Confetti)
+     ============================================================ */
+  let confettiAnimId = null;
+  let confettiParticles = [];
+
+  function triggerBingoCelebration() {
+    playBingoWinFanfare();
+    document.getElementById("win-ip-display").textContent = `已登記連線 IP：${clientIP}`;
+    document.getElementById("celebration-screen").style.display = "flex";
+    startConfetti();
+  }
+
+  function startConfetti() {
+    const canvas = document.getElementById("confetti-canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = ["#facc15", "#f43f5e", "#38bdf8", "#4ade80", "#a855f7", "#fb923c"];
+    confettiParticles = [];
+
+    for (let i = 0; i < 160; i++) {
+      confettiParticles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height - canvas.height,
+        w: Math.random() * 12 + 6,
+        h: Math.random() * 8 + 4,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        speedY: Math.random() * 3.5 + 2,
+        speedX: Math.random() * 2 - 1,
+        angle: Math.random() * 360,
+        spin: Math.random() * 6 - 3
+      });
+    }
+
+    function renderConfetti() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      confettiParticles.forEach(p => {
+        p.y += p.speedY;
+        p.x += p.speedX;
+        p.angle += p.spin;
+        if (p.y > canvas.height) {
+          p.y = -20;
+          p.x = Math.random() * canvas.width;
+        }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.angle * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      confettiAnimId = requestAnimationFrame(renderConfetti);
+    }
+
+    renderConfetti();
+  }
+
+  function stopConfetti() {
+    if (confettiAnimId) {
+      cancelAnimationFrame(confettiAnimId);
+      confettiAnimId = null;
+    }
+    const canvas = document.getElementById("confetti-canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  window.addEventListener("resize", () => {
+    const canvas = document.getElementById("confetti-canvas");
+    if (canvas && document.getElementById("celebration-screen").style.display === "flex") {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+  });
+</script>
+</body>
+</html>
